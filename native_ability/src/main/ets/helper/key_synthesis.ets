@@ -92,53 +92,52 @@ export const KEY_SYNTHESIS_SHIM: string =
  * (contiguous in the ohos enum: A=2017..Z=2042, 0=2000..9=2009,
  * F1=2090..F12=2101, Numpad0=2103..Numpad9=2112).
  */
-const SPECIAL_KEYS: Map<number, DomKeyInfo> = new Map([
-  [2012, { code: "ArrowUp", key: "ArrowUp", keyCode: 38, location: 0 }],
-  [2013, { code: "ArrowDown", key: "ArrowDown", keyCode: 40, location: 0 }],
-  [2014, { code: "ArrowLeft", key: "ArrowLeft", keyCode: 37, location: 0 }],
-  [2015, { code: "ArrowRight", key: "ArrowRight", keyCode: 39, location: 0 }],
-  [2043, { code: "Comma", key: ",", keyCode: 188, location: 0 }],
-  [2044, { code: "Period", key: ".", keyCode: 190, location: 0 }],
-  [2045, { code: "AltLeft", key: "Alt", keyCode: 18, location: 1 }],
-  [2046, { code: "AltRight", key: "Alt", keyCode: 18, location: 2 }],
-  [2047, { code: "ShiftLeft", key: "Shift", keyCode: 16, location: 1 }],
-  [2048, { code: "ShiftRight", key: "Shift", keyCode: 16, location: 2 }],
-  [2049, { code: "Tab", key: "Tab", keyCode: 9, location: 0 }],
-  [2050, { code: "Space", key: " ", keyCode: 32, location: 0 }],
-  [2054, { code: "Enter", key: "Enter", keyCode: 13, location: 0 }],
-  [2055, { code: "Backspace", key: "Backspace", keyCode: 8, location: 0 }],
-  [2056, { code: "Backquote", key: "`", keyCode: 192, location: 0 }],
-  [2057, { code: "Minus", key: "-", keyCode: 189, location: 0 }],
-  [2058, { code: "Equal", key: "=", keyCode: 187, location: 0 }],
-  [2059, { code: "BracketLeft", key: "[", keyCode: 219, location: 0 }],
-  [2060, { code: "BracketRight", key: "]", keyCode: 221, location: 0 }],
-  [2061, { code: "Backslash", key: "\\", keyCode: 220, location: 0 }],
-  [2062, { code: "Semicolon", key: ";", keyCode: 186, location: 0 }],
-  [2063, { code: "Quote", key: "'", keyCode: 222, location: 0 }],
-  [2064, { code: "Slash", key: "/", keyCode: 191, location: 0 }],
-  [2068, { code: "PageUp", key: "PageUp", keyCode: 33, location: 0 }],
-  [2069, { code: "PageDown", key: "PageDown", keyCode: 34, location: 0 }],
-  [2070, { code: "Escape", key: "Escape", keyCode: 27, location: 0 }],
-  [2071, { code: "Delete", key: "Delete", keyCode: 46, location: 0 }],
-  [2072, { code: "ControlLeft", key: "Control", keyCode: 17, location: 1 }],
-  [2073, { code: "ControlRight", key: "Control", keyCode: 17, location: 2 }],
-  [2074, { code: "CapsLock", key: "CapsLock", keyCode: 20, location: 0 }],
-  [2075, { code: "ScrollLock", key: "ScrollLock", keyCode: 145, location: 0 }],
-  [2076, { code: "MetaLeft", key: "Meta", keyCode: 91, location: 1 }],
-  [2077, { code: "MetaRight", key: "Meta", keyCode: 93, location: 2 }],
-  [2081, { code: "Home", key: "Home", keyCode: 36, location: 0 }],
-  [2082, { code: "End", key: "End", keyCode: 35, location: 0 }],
-  [2083, { code: "Insert", key: "Insert", keyCode: 45, location: 0 }],
-  [2102, { code: "NumLock", key: "NumLock", keyCode: 144, location: 0 }],
-  [2113, { code: "NumpadDivide", key: "/", keyCode: 111, location: 3 }],
-  [2114, { code: "NumpadMultiply", key: "*", keyCode: 106, location: 3 }],
-  [2115, { code: "NumpadSubtract", key: "-", keyCode: 109, location: 3 }],
-  [2116, { code: "NumpadAdd", key: "+", keyCode: 107, location: 3 }],
-  [2117, { code: "NumpadDecimal", key: ".", keyCode: 110, location: 3 }],
-  [2118, { code: "NumpadComma", key: ",", keyCode: 110, location: 3 }],
-  [2119, { code: "NumpadEnter", key: "Enter", keyCode: 13, location: 3 }],
-  [2120, { code: "NumpadEqual", key: "=", keyCode: 187, location: 3 }],
-]);
+const SPECIAL_KEYS: Map<number, DomKeyInfo> = new Map();
+SPECIAL_KEYS.set(2012, { code: "ArrowUp", key: "ArrowUp", keyCode: 38, location: 0 });
+SPECIAL_KEYS.set(2013, { code: "ArrowDown", key: "ArrowDown", keyCode: 40, location: 0 });
+SPECIAL_KEYS.set(2014, { code: "ArrowLeft", key: "ArrowLeft", keyCode: 37, location: 0 });
+SPECIAL_KEYS.set(2015, { code: "ArrowRight", key: "ArrowRight", keyCode: 39, location: 0 });
+SPECIAL_KEYS.set(2043, { code: "Comma", key: ",", keyCode: 188, location: 0 });
+SPECIAL_KEYS.set(2044, { code: "Period", key: ".", keyCode: 190, location: 0 });
+SPECIAL_KEYS.set(2045, { code: "AltLeft", key: "Alt", keyCode: 18, location: 1 });
+SPECIAL_KEYS.set(2046, { code: "AltRight", key: "Alt", keyCode: 18, location: 2 });
+SPECIAL_KEYS.set(2047, { code: "ShiftLeft", key: "Shift", keyCode: 16, location: 1 });
+SPECIAL_KEYS.set(2048, { code: "ShiftRight", key: "Shift", keyCode: 16, location: 2 });
+SPECIAL_KEYS.set(2049, { code: "Tab", key: "Tab", keyCode: 9, location: 0 });
+SPECIAL_KEYS.set(2050, { code: "Space", key: " ", keyCode: 32, location: 0 });
+SPECIAL_KEYS.set(2054, { code: "Enter", key: "Enter", keyCode: 13, location: 0 });
+SPECIAL_KEYS.set(2055, { code: "Backspace", key: "Backspace", keyCode: 8, location: 0 });
+SPECIAL_KEYS.set(2056, { code: "Backquote", key: "`", keyCode: 192, location: 0 });
+SPECIAL_KEYS.set(2057, { code: "Minus", key: "-", keyCode: 189, location: 0 });
+SPECIAL_KEYS.set(2058, { code: "Equal", key: "=", keyCode: 187, location: 0 });
+SPECIAL_KEYS.set(2059, { code: "BracketLeft", key: "[", keyCode: 219, location: 0 });
+SPECIAL_KEYS.set(2060, { code: "BracketRight", key: "]", keyCode: 221, location: 0 });
+SPECIAL_KEYS.set(2061, { code: "Backslash", key: "\\", keyCode: 220, location: 0 });
+SPECIAL_KEYS.set(2062, { code: "Semicolon", key: ";", keyCode: 186, location: 0 });
+SPECIAL_KEYS.set(2063, { code: "Quote", key: "'", keyCode: 222, location: 0 });
+SPECIAL_KEYS.set(2064, { code: "Slash", key: "/", keyCode: 191, location: 0 });
+SPECIAL_KEYS.set(2068, { code: "PageUp", key: "PageUp", keyCode: 33, location: 0 });
+SPECIAL_KEYS.set(2069, { code: "PageDown", key: "PageDown", keyCode: 34, location: 0 });
+SPECIAL_KEYS.set(2070, { code: "Escape", key: "Escape", keyCode: 27, location: 0 });
+SPECIAL_KEYS.set(2071, { code: "Delete", key: "Delete", keyCode: 46, location: 0 });
+SPECIAL_KEYS.set(2072, { code: "ControlLeft", key: "Control", keyCode: 17, location: 1 });
+SPECIAL_KEYS.set(2073, { code: "ControlRight", key: "Control", keyCode: 17, location: 2 });
+SPECIAL_KEYS.set(2074, { code: "CapsLock", key: "CapsLock", keyCode: 20, location: 0 });
+SPECIAL_KEYS.set(2075, { code: "ScrollLock", key: "ScrollLock", keyCode: 145, location: 0 });
+SPECIAL_KEYS.set(2076, { code: "MetaLeft", key: "Meta", keyCode: 91, location: 1 });
+SPECIAL_KEYS.set(2077, { code: "MetaRight", key: "Meta", keyCode: 93, location: 2 });
+SPECIAL_KEYS.set(2081, { code: "Home", key: "Home", keyCode: 36, location: 0 });
+SPECIAL_KEYS.set(2082, { code: "End", key: "End", keyCode: 35, location: 0 });
+SPECIAL_KEYS.set(2083, { code: "Insert", key: "Insert", keyCode: 45, location: 0 });
+SPECIAL_KEYS.set(2102, { code: "NumLock", key: "NumLock", keyCode: 144, location: 0 });
+SPECIAL_KEYS.set(2113, { code: "NumpadDivide", key: "/", keyCode: 111, location: 3 });
+SPECIAL_KEYS.set(2114, { code: "NumpadMultiply", key: "*", keyCode: 106, location: 3 });
+SPECIAL_KEYS.set(2115, { code: "NumpadSubtract", key: "-", keyCode: 109, location: 3 });
+SPECIAL_KEYS.set(2116, { code: "NumpadAdd", key: "+", keyCode: 107, location: 3 });
+SPECIAL_KEYS.set(2117, { code: "NumpadDecimal", key: ".", keyCode: 110, location: 3 });
+SPECIAL_KEYS.set(2118, { code: "NumpadComma", key: ",", keyCode: 110, location: 3 });
+SPECIAL_KEYS.set(2119, { code: "NumpadEnter", key: "Enter", keyCode: 13, location: 3 });
+SPECIAL_KEYS.set(2120, { code: "NumpadEqual", key: "=", keyCode: 187, location: 3 });
 
 function domKeyInfoOf(keyCode: number): DomKeyInfo | null {
   if (keyCode >= 2017 && keyCode <= 2042) {

@@ -181,7 +181,7 @@ export struct DefaultXComponent {
   aboutToDisappear(): void {
     // Sub-window mode cleanup: unregister component root and dispose FrameNode
     if (!this.moduleName.trim() && this.windowId > 0) {
-      WindowManager.getInstance().registerComponentRoot(this.windowId, undefined as any);
+      WindowManager.getInstance().unregisterComponentRoot(this.windowId);
       this.nodeController.disposeRoot();
       return;
     }

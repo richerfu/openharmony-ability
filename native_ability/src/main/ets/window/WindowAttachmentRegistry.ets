@@ -99,6 +99,10 @@ export class WindowAttachmentRegistry {
     this.flushPendingComponentRootCallbacks(windowId);
   }
 
+  unregisterComponentRoot(windowId: number): void {
+    this.componentRoots.delete(windowId);
+  }
+
   // Get component root for a sub-window (called by WebviewSurface.create)
   getComponentRoot(windowId: number): FrameNode | undefined {
     const root = this.componentRoots.get(windowId);

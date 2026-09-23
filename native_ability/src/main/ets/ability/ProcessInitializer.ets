@@ -32,15 +32,15 @@ export class ProcessInitializer {
   private static loadedModuleNames: string[] = [];
 
   static isInitialized(): boolean {
-    return this.initialized;
+    return ProcessInitializer.initialized;
   }
 
   static getNativeModules(): Module[] {
-    return this.nativeModules;
+    return ProcessInitializer.nativeModules;
   }
 
   static getLoadedModuleNames(): string[] {
-    return this.loadedModuleNames;
+    return ProcessInitializer.loadedModuleNames;
   }
 
   static createInitContext(
@@ -68,7 +68,7 @@ export class ProcessInitializer {
     loadMode: "async" | "sync",
     want: Want,
   ): Promise<void> {
-    if (this.initialized) {
+    if (ProcessInitializer.initialized) {
       hilog.info(DOMAIN, "ProcessInitializer", "Already initialized, skipping");
       return;
     }
@@ -85,8 +85,8 @@ export class ProcessInitializer {
     let webEngineRequired = false;
     for (const name of requestedModules) {
       const module: Module = await Loadable.load(name, loadMode);
-      this.nativeModules.push(module);
-      this.loadedModuleNames.push(name);
+      ProcessInitializer.nativeModules.push(module);
+      ProcessInitializer.loadedModuleNames.push(name);
 
       if (typeof module.registerCustomProtocol === "function") {
         module.registerCustomProtocol();
@@ -103,7 +103,7 @@ export class ProcessInitializer {
     // The windowing backend's Window::new() calls create_os_window() synchronously, which needs a TSFN
     // (not the async bridge plugin path) to fire-and-forget sub-window creation on ArkTS.
     const wm = WindowManager.getInstance();
-    for (const module of this.nativeModules) {
+    for (const module of ProcessInitializer.nativeModules) {
       if (typeof module.registerCreateSubWindowTsfn === "function") {
         module.registerCreateSubWindowTsfn(
           (config: ESObject): Promise<number> => wm.createSubWindow(config),
@@ -123,11 +123,11 @@ export class ProcessInitializer {
     // never invoked → ArkTS destroys the Float window but the Rust tauri manager keeps a
     // zombie entry → getByLabel returns a dead handle → same-label windows can't rebuild
     // (manual_tests §二十八 close lifecycle defect).
-    if (this.nativeModules.length > 0) {
-      AppStorage.setOrCreate<Module>(NATIVE_MODULE_STORAGE_KEY, this.nativeModules[0]);
+    if (ProcessInitializer.nativeModules.length > 0) {
+      AppStorage.setOrCreate<Module>(NATIVE_MODULE_STORAGE_KEY, ProcessInitializer.nativeModules[0]);
     }
 
-    this.initialized = true;
+    ProcessInitializer.initialized = true;
     hilog.info(DOMAIN, "ProcessInitializer", "Process initialization complete");
   }
 }
