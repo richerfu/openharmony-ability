@@ -229,6 +229,7 @@ export struct DefaultXComponent {
         .backgroundColor(Color.Transparent)
       }
       .height("100%")
+      .hitTestBehavior(HitTestMode.Transparent)
       .backgroundColor(Color.Transparent)
     }.backgroundColor(Color.Transparent);
   }
