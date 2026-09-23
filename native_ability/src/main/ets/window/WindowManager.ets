@@ -1419,7 +1419,7 @@ export class WindowManager {
         `Failed to create sub-window: %{public}s`,
         JSON.stringify(err),
       );
-      throw new Error(String(err));
+      throw err as Error;
     }
 
     // Use LocalStorage to pass windowId and decorations, ensuring isolation between windows
@@ -1544,7 +1544,7 @@ export class WindowManager {
         windowId,
         JSON.stringify(err),
       );
-      throw new Error(String(err));
+      throw err as Error;
     }
 
     try {
@@ -1636,7 +1636,7 @@ export class WindowManager {
         `Failed to resize/move/show window: %{public}s`,
         JSON.stringify(err),
       );
-      throw new Error(String(err));
+      throw err as Error;
     }
 
     return windowId;
