@@ -21,6 +21,7 @@ interface Position {
 struct FloatPage {
   // Receive windowId from WindowManager.createSubWindow
   @LocalStorageProp("windowId") windowId: number = 0;
+  @LocalStorageProp("nativeModuleName") nativeModuleName: string = "";
   @LocalStorageProp("decorations") decorations: boolean = true;
   // D group: decoration button availability (all available by default). Written by WindowManager.setDecorationFlags.
   @LocalStorageProp("closable") closable: boolean = true;
@@ -69,6 +70,9 @@ struct FloatPage {
     this.closeNotified = true;
     try {
       const nativeModule: Module | undefined = AppStorage.get<Module>(NATIVE_MODULE_STORAGE_KEY);
+      if (this.nativeModuleName && nativeModule?.notifyNativeWindowClose) {
+        nativeModule.notifyNativeWindowClose(this.windowId);
+      }
       if (nativeModule && typeof nativeModule.notifyWindowClose === "function") {
         nativeModule.notifyWindowClose(this.windowId);
         hilog.info(
@@ -214,7 +218,7 @@ struct FloatPage {
         }
         Stack({ alignContent: Alignment.TopEnd }) {
           // 1. WebView content area (full screen)
-          DefaultXComponent({ windowId: this.windowId })
+          DefaultXComponent({ moduleName: this.nativeModuleName, windowId: this.windowId })
             .width("100%")
             .height("100%")
 
@@ -342,6 +346,9 @@ struct FloatPage {
                     // so CloseRequested → Destroyed → WindowsStore cleanup can run.
                     const nativeModule: Module | undefined =
                       AppStorage.get<Module>(NATIVE_MODULE_STORAGE_KEY);
+                    if (this.nativeModuleName && nativeModule?.notifyNativeWindowClose) {
+                      nativeModule.notifyNativeWindowClose(this.windowId);
+                    }
                     if (nativeModule && typeof nativeModule.notifyWindowClose === "function") {
                       nativeModule.notifyWindowClose(this.windowId);
                       hilog.info(

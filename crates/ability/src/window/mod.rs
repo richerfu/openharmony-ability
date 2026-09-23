@@ -24,6 +24,8 @@ static NEXT_WINDOW_ID: AtomicI64 = AtomicI64::new(1);
 pub struct WindowCreateParams {
     /// Window label/name, used as the ArkTS sub-window name.
     pub name: String,
+    /// Native module to render into this Float window. Empty keeps the WebView-only path.
+    pub native_module_name: Option<String>,
     /// OHOS window type enum value (0=App, 8=Float, etc.)
     pub window_type: i32,
     /// Initial window width in px. Default: 800.
@@ -49,6 +51,7 @@ impl Default for WindowCreateParams {
     fn default() -> Self {
         Self {
             name: String::new(),
+            native_module_name: None,
             window_type: 0,
             width: 800,
             height: 600,
@@ -100,6 +103,7 @@ pub fn create_os_window(params: WindowCreateParams) -> napi_ohos::Result<i64> {
     let status = tsfn.call(
         (
             params.name,
+            params.native_module_name,
             id,
             params.width,
             params.height,
@@ -139,7 +143,18 @@ pub fn create_os_window(params: WindowCreateParams) -> napi_ohos::Result<i64> {
 // immediately without waiting for ArkTS to finish (the sub-window is guaranteed to be
 // ready before the webview bridge create arrives, since both are serialized on the
 // ArkTS UI thread event loop and createSubWindow is dispatched first).
-type CreateSubWindowParams = (String, i64, i32, i32, i32, i32, bool, bool, Option<u32>);
+type CreateSubWindowParams = (
+    String,
+    Option<String>,
+    i64,
+    i32,
+    i32,
+    i32,
+    i32,
+    bool,
+    bool,
+    Option<u32>,
+);
 type CreateSubWindowTsfn =
     ThreadsafeFunction<CreateSubWindowParams, (), FnArgs<(Object<'static>,)>, Status, false>;
 static TSFN_CREATE_SUB_WINDOW: OnceLock<CreateSubWindowTsfn> = OnceLock::new();
@@ -178,9 +193,23 @@ fn build_create_sub_window_args(
     env: Env,
     value: CreateSubWindowParams,
 ) -> Result<(Object<'static>,)> {
-    let (name, window_id, width, height, x, y, decorations, transparent, bg_color) = value;
+    let (
+        name,
+        native_module_name,
+        window_id,
+        width,
+        height,
+        x,
+        y,
+        decorations,
+        transparent,
+        bg_color,
+    ) = value;
     let mut config = Object::new(&env)?;
     config.set("name", name)?;
+    if let Some(module_name) = native_module_name {
+        config.set("nativeModuleName", module_name)?;
+    }
     config.set("windowId", window_id)?;
     config.set("width", width)?;
     config.set("height", height)?;

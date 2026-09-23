@@ -90,7 +90,11 @@ fn dispatch_input(app: &OpenHarmonyApp, owner: &str, event: InputEvent) {
         return;
     }
     if let Some(ref mut handler) = *app.event_loop.borrow_mut() {
-        handler(Event::Input(event));
+        match app.render_window_id(owner) {
+            Some(0) => handler(Event::Input(event)),
+            Some(window_id) => handler(Event::SubWindowInput { window_id, event }),
+            None => {}
+        }
     }
 }
 
@@ -235,6 +239,16 @@ pub fn render(
     render_owner: String,
     app: OpenHarmonyApp,
 ) -> Result<RootNode> {
+    render_for_window(env, slot, render_owner, app, 0)
+}
+
+pub fn render_for_window(
+    env: &Env,
+    slot: ArkUIHandle,
+    render_owner: String,
+    app: OpenHarmonyApp,
+    window_id: i64,
+) -> Result<RootNode> {
     set_main_thread_env(*env);
 
     // All eager `get_helper()` TSFN inits (statusbar tray, vibrancy, clipboard image,
@@ -258,14 +272,14 @@ pub fn render(
 
     let xcomponent = xcomponent_native.native_xcomponent();
 
-    let touch_input_delivery = app.begin_render(&render_owner, xcomponent_native.clone())?;
+    let touch_input_delivery =
+        app.begin_render(&render_owner, window_id, xcomponent_native.clone())?;
     let mut render_guard = RenderOwnerGuard::new(app.clone(), render_owner.clone());
 
     let xc = xcomponent.clone();
 
     let on_surface_created_app = app.clone();
     let on_surface_created_owner = render_owner.clone();
-    let insert_text_app = app.clone();
     let redraw_app = app.clone();
 
     let (
@@ -310,32 +324,44 @@ pub fn render(
 
         // We need to create IME instance when app is focused.
         let ime = IME::new(Default::default());
-        *on_surface_created_app.ime.borrow_mut() = Some(ime);
 
-        if let Some(b_ime) = insert_text_app.ime.borrow().as_ref() {
+        {
             let insert_text_callback_tsfn = insert_text_callback_tsfn.clone();
             let on_ime_hide_callback_tsfn = on_ime_hide_callback_tsfn.clone();
             let on_backspace_callback_tsfn = on_backspace_callback_tsfn.clone();
             let on_ime_enter_callback_tsfn = on_ime_enter_callback_tsfn.clone();
 
             // // run in other thread
-            b_ime.insert_text(move |s| {
+            ime.insert_text(move |s| {
                 insert_text_callback_tsfn.call(s, NonBlocking);
             });
-            b_ime.on_status_change(move |s| {
+            ime.on_status_change(move |s| {
                 on_ime_hide_callback_tsfn.call(s.into(), NonBlocking);
             });
-            b_ime.on_backspace(move |len| {
+            ime.on_backspace(move |len| {
                 on_backspace_callback_tsfn.call(len, NonBlocking);
             });
-            b_ime.on_enter(move |key| {
+            ime.on_enter(move |key| {
                 on_ime_enter_callback_tsfn.call(key as i32, NonBlocking);
             });
         }
 
+        if window_id == 0 {
+            *on_surface_created_app.ime.borrow_mut() = Some(ime);
+        } else {
+            on_surface_created_app
+                .sub_ime
+                .borrow_mut()
+                .insert(window_id, ime);
+        }
+
         {
             if let Some(ref mut h) = *on_surface_created_app.event_loop.borrow_mut() {
-                h(Event::SurfaceCreate)
+                if window_id == 0 {
+                    h(Event::SurfaceCreate)
+                } else {
+                    h(Event::SubWindowSurfaceCreate(window_id))
+                }
             }
         }
 
@@ -346,10 +372,18 @@ pub fn render(
                 return Ok(());
             }
             if let Some(ref mut h) = *inner_redraw_app.event_loop.borrow_mut() {
-                h(Event::WindowRedraw(IntervalInfo {
+                let interval = IntervalInfo {
                     time_stamp: _time_stamp as _,
                     target_time_stamp: _time as _,
-                }))
+                };
+                if window_id == 0 {
+                    h(Event::WindowRedraw(interval))
+                } else {
+                    h(Event::SubWindowRedraw {
+                        window_id,
+                        interval,
+                    })
+                }
             }
             Ok(())
         })?;
@@ -360,7 +394,12 @@ pub fn render(
     let on_surface_destroyed_owner = render_owner.clone();
     xcomponent.on_surface_destroyed(move |_, _| {
         if on_surface_destroyed_app.deactivate_render_surface(&on_surface_destroyed_owner) {
-            on_surface_destroyed_app.dispatch_surface_destroy();
+            if window_id == 0 {
+                on_surface_destroyed_app.dispatch_surface_destroy();
+            } else if let Some(ref mut handler) = *on_surface_destroyed_app.event_loop.borrow_mut()
+            {
+                handler(Event::SubWindowSurfaceDestroy(window_id));
+            }
         }
         Ok(())
     });
@@ -400,7 +439,7 @@ pub fn render(
                 // surface, so window_id is always 0. Carrying it explicitly lets tao's
                 // run_loop route WindowResize uniformly (instead of a special-cased ZST).
                 h(Event::WindowResize {
-                    window_id: 0,
+                    window_id,
                     size: Size {
                         width: size.width as _,
                         height: size.height as _,

@@ -17,6 +17,11 @@ pub enum Event<'a> {
     WindowDestroy,
 
     WindowRedraw(IntervalInfo),
+    /// Frame callback from a native XComponent in a Float sub-window.
+    SubWindowRedraw {
+        window_id: i64,
+        interval: IntervalInfo,
+    },
     /// window resize event
     /// alias window.on("windowSizeChange")
     /// https://developer.huawei.com/consumer/cn/doc/harmonyos-references-V5/js-apis-window-V5#onwindowsizechange7
@@ -86,12 +91,19 @@ pub enum Event<'a> {
     /// alias onSurfaceCreated for XComponent
     /// We can render EGL/OpenGL in this event
     SurfaceCreate,
+    SubWindowSurfaceCreate(i64),
     /// surface destroy event
     /// alias onSurfaceDestroyed for XComponent
     SurfaceDestroy,
+    SubWindowSurfaceDestroy(i64),
+    SubWindowClosed(i64),
     /// surface input event
     /// IME
     Input(InputEvent),
+    SubWindowInput {
+        window_id: i64,
+        event: InputEvent,
+    },
 
     /// keyboard event
     /// alias onKeyboardHeightChange
@@ -114,6 +126,7 @@ impl<'a> Event<'a> {
             Event::WindowCreate => "WindowCreate",
             Event::WindowDestroy => "WindowDestroy",
             Event::WindowRedraw(_) => "WindowRedraw",
+            Event::SubWindowRedraw { .. } => "SubWindowRedraw",
             Event::WindowResize { .. } => "WindowResize",
             Event::ContentRectChange(_) => "ContentRectChange",
             Event::AvoidAreaChange(_) => "AvoidAreaChange",
@@ -129,8 +142,12 @@ impl<'a> Event<'a> {
             Event::Create => "Create",
             Event::Destroy => "Destroy",
             Event::SurfaceCreate => "SurfaceCreate",
+            Event::SubWindowSurfaceCreate(_) => "SubWindowSurfaceCreate",
             Event::SurfaceDestroy => "SurfaceDestroy",
+            Event::SubWindowSurfaceDestroy(_) => "SubWindowSurfaceDestroy",
+            Event::SubWindowClosed(_) => "SubWindowClosed",
             Event::Input(_) => "Input",
+            Event::SubWindowInput { .. } => "SubWindowInput",
             Event::UserEvent => "UserEvent",
             Event::KeyboardEvent(_) => "KeyboardEvent",
             Event::NewWant { .. } => "NewWant",

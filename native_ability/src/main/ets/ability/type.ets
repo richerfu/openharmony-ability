@@ -168,6 +168,9 @@ export interface Module {
    * DefaultXComponent must use a different native module.
    */
   render: (slot: NodeContent, renderOwner: string) => void;
+  /** Mounts a second native render surface in the specified Float sub-window. */
+  renderWindow?: (slot: NodeContent, renderOwner: string, windowId: number) => void;
+  notifyNativeWindowClose?: (windowId: number) => void;
   /** Releases only the render tree owned by `renderOwner`. */
   disposeRender: (renderOwner: string) => void;
   /** Releases the remaining render tree when the WindowStage is torn down. */

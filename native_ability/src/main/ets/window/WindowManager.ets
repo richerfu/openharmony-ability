@@ -38,6 +38,7 @@ interface WindowEntry {
 // Encapsulates all parameters for sub-window creation, replacing a 10-arg signature.
 export interface SubWindowOptions {
   name: string;
+  nativeModuleName?: string;
   windowId: number;
   width?: number;
   height?: number;
@@ -1425,6 +1426,7 @@ export class WindowManager {
     // Use LocalStorage to pass windowId and decorations, ensuring isolation between windows
     let storage = new LocalStorage();
     storage.setOrCreate("windowId", windowId);
+    storage.setOrCreate("nativeModuleName", opts.nativeModuleName ?? "");
     storage.setOrCreate("decorations", decorations);
     // D group decoration flags default (all available; setDecorationFlags updates them)
     storage.setOrCreate("closable", true);

@@ -14,6 +14,16 @@ type ImeCallback = (
     ThreadsafeFunction<i32, (), i32, Status, false>,
 );
 
+fn dispatch_ime_input(app: &OpenHarmonyApp, owner: &str, event: InputEvent) {
+    if let Some(ref mut handler) = *app.event_loop.borrow_mut() {
+        match app.render_window_id(owner) {
+            Some(0) => handler(Event::Input(event)),
+            Some(window_id) => handler(Event::SubWindowInput { window_id, event }),
+            None => {}
+        }
+    }
+}
+
 pub fn ime_ts_fn(env: &Env, app: OpenHarmonyApp, render_owner: String) -> Result<ImeCallback> {
     // insert event
     let on_insert_text_app = app.clone();
@@ -30,11 +40,11 @@ pub fn ime_ts_fn(env: &Env, app: OpenHarmonyApp, render_owner: String) -> Result
                 crate::warn!("ime_insert_callback: first_arg missing/invalid, dropping event");
                 return Ok(());
             };
-            if let Some(ref mut h) = *on_insert_text_app.event_loop.borrow_mut() {
-                h(Event::Input(InputEvent::Ime(ImeEvent::TextInputEvent(
-                    TextInputEventData { text: s },
-                ))))
-            }
+            dispatch_ime_input(
+                &on_insert_text_app,
+                &on_insert_text_owner,
+                InputEvent::Ime(ImeEvent::TextInputEvent(TextInputEventData { text: s })),
+            );
             Ok(())
         })?;
 
@@ -60,11 +70,11 @@ pub fn ime_ts_fn(env: &Env, app: OpenHarmonyApp, render_owner: String) -> Result
             };
 
             let status = KeyboardStatus::from(value);
-            if let Some(ref mut h) = *on_ime_hide_app.event_loop.borrow_mut() {
-                h(Event::Input(InputEvent::Ime(ImeEvent::ImeStatusEvent(
-                    status,
-                ))))
-            }
+            dispatch_ime_input(
+                &on_ime_hide_app,
+                &on_ime_hide_owner,
+                InputEvent::Ime(ImeEvent::ImeStatusEvent(status)),
+            );
             Ok(())
         })?;
 
@@ -85,11 +95,11 @@ pub fn ime_ts_fn(env: &Env, app: OpenHarmonyApp, render_owner: String) -> Result
                 crate::warn!("on_backspace_callback: first_arg missing/invalid, dropping event");
                 return Ok(());
             };
-            if let Some(ref mut h) = *on_backspace_app.event_loop.borrow_mut() {
-                h(Event::Input(InputEvent::Ime(ImeEvent::BackspaceEvent(
-                    value,
-                ))))
-            }
+            dispatch_ime_input(
+                &on_backspace_app,
+                &on_backspace_owner,
+                InputEvent::Ime(ImeEvent::BackspaceEvent(value)),
+            );
             Ok(())
         })?;
 
@@ -110,9 +120,11 @@ pub fn ime_ts_fn(env: &Env, app: OpenHarmonyApp, render_owner: String) -> Result
                 crate::warn!("on_ime_enter_callback: first_arg missing/invalid, dropping event");
                 return Ok(());
             };
-            if let Some(ref mut h) = *on_ime_enter_app.event_loop.borrow_mut() {
-                h(Event::Input(InputEvent::Ime(ImeEvent::EnterEvent(value))))
-            }
+            dispatch_ime_input(
+                &on_ime_enter_app,
+                &on_ime_enter_owner,
+                InputEvent::Ime(ImeEvent::EnterEvent(value)),
+            );
             Ok(())
         })?;
 

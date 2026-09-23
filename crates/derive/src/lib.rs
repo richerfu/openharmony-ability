@@ -49,6 +49,33 @@ pub fn ability(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         #[napi_derive_ohos::napi]
+        pub fn render_window<'a>(
+            env: &'a napi_ohos::Env,
+            #[napi(ts_arg_type = "NodeContent")] slot: ::openharmony_ability::arkui::ArkUIHandle,
+            render_owner: String,
+            window_id: u32,
+        ) -> napi_ohos::Result<()> {
+            if window_id == 0 || render_owner.is_empty() {
+                return Err(napi_ohos::Error::from_reason("A sub-window needs a positive window ID and render owner"));
+            }
+            if SUB_ROOT_NODES.with(|nodes| nodes.borrow().contains_key(&window_id)) {
+                return Err(napi_ohos::Error::from_reason("This sub-window is already rendered"));
+            }
+            let root = ::openharmony_ability::render_for_window(
+                env, slot, render_owner.clone(), (*APP).clone(), i64::from(window_id),
+            )?;
+            SUB_ROOT_NODES.with(|nodes| { nodes.borrow_mut().insert(window_id, (render_owner, root)); });
+            Ok(())
+        }
+
+        #[napi_derive_ohos::napi]
+        pub fn notify_native_window_close(window_id: u32) {
+            if window_id > 0 {
+                (*APP).dispatch_sub_window_closed(i64::from(window_id));
+            }
+        }
+
+        #[napi_derive_ohos::napi]
         pub fn dispose_render(render_owner: String) {
             ROOT_NODE.with(|node| {
                 let owns_render = node
@@ -62,6 +89,15 @@ pub fn ability(attr: TokenStream, item: TokenStream) -> TokenStream {
                     (*APP).release_render(&render_owner);
                 }
             });
+            SUB_ROOT_NODES.with(|nodes| {
+                let id = nodes.borrow().iter().find_map(|(id, (owner, _))|
+                    (owner == &render_owner).then_some(*id));
+                if let Some(id) = id {
+                    let root = nodes.borrow_mut().remove(&id);
+                    drop(root);
+                    (*APP).release_render(&render_owner);
+                }
+            });
         }
 
         #[napi_derive_ohos::napi]
@@ -69,6 +105,12 @@ pub fn ability(attr: TokenStream, item: TokenStream) -> TokenStream {
             ROOT_NODE.with(|node| {
                 let root = node.borrow_mut().take();
                 if let Some((owner, root)) = root {
+                    drop(root);
+                    (*APP).release_render(&owner);
+                }
+            });
+            SUB_ROOT_NODES.with(|nodes| {
+                for (_, (owner, root)) in nodes.borrow_mut().drain() {
                     drop(root);
                     (*APP).release_render(&owner);
                 }
@@ -110,6 +152,7 @@ pub fn ability(attr: TokenStream, item: TokenStream) -> TokenStream {
 
             thread_local! {
                 pub static ROOT_NODE: std::cell::RefCell<Option<(String, ::openharmony_ability::arkui::RootNode)>> = std::cell::RefCell::new(None);
+                pub static SUB_ROOT_NODES: std::cell::RefCell<std::collections::HashMap<u32, (String, ::openharmony_ability::arkui::RootNode)>> = std::cell::RefCell::new(std::collections::HashMap::new());
             }
 
             #[napi_derive_ohos::napi]

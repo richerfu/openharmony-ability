@@ -50,6 +50,7 @@ interface ComponentAttachment {
   moduleName: string;
   renderOwner: string;
   nativeModule: Module;
+  nativeSubWindow: boolean;
 }
 
 /**
@@ -106,6 +107,30 @@ export struct DefaultXComponent {
       return;
     }
 
+    if (moduleName && this.windowId > 0) {
+      const nativeModule = await NativeModuleLoader.load(moduleName, this.loadMode);
+      if (generation !== this.appearanceGeneration) {
+        return;
+      }
+      if (!nativeModule.renderWindow) {
+        throw new Error(`Native module '${moduleName}' does not support sub-window rendering`);
+      }
+      const renderOwner = `${this.bridgeSessionId}:${moduleName}:${nextRenderOwnerId++}`;
+      nativeModule.renderWindow(this.rootSlot, renderOwner, this.windowId);
+      if (generation !== this.appearanceGeneration) {
+        nativeModule.disposeRender(renderOwner);
+        return;
+      }
+      this.attachment = {
+        sessionId: this.bridgeSessionId,
+        moduleName,
+        renderOwner,
+        nativeModule,
+        nativeSubWindow: true,
+      };
+      return;
+    }
+
     if (!moduleName) {
       throw new Error("DefaultXComponent.moduleName is required");
     }
@@ -149,6 +174,7 @@ export struct DefaultXComponent {
       moduleName,
       renderOwner,
       nativeModule,
+      nativeSubWindow: false,
     };
     this.attachment = attachment;
     try {
@@ -202,6 +228,10 @@ export struct DefaultXComponent {
     // RootNode owns the ContentSlot handle and must be dropped synchronously while this component
     // still owns a live NodeContent. Host/plugin cleanup may continue asynchronously afterwards.
     attachment.nativeModule.disposeRender(attachment.renderOwner);
+    if (attachment.nativeSubWindow) {
+      this.nodeController.disposeRoot();
+      return Promise.resolve();
+    }
     return BridgeHostRegistry.detachComponent(
       attachment.sessionId,
       attachment.moduleName,
