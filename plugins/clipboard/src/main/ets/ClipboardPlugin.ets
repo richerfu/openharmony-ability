@@ -93,6 +93,13 @@ export class ClipboardPlugin extends AsyncPluginBase {
       expectBridgeRequestType(payload, "ohos.clipboard", action, READ_TEXT_REQUEST_TYPE);
       const systemPasteboard = pasteboard.getSystemPasteboard();
       const data = await systemPasteboard.getData();
+      // On OHOS, a denied READ_PASTEBOARD can return an empty PasteData without
+      // rejecting getData(). Distinguish that from a genuinely empty clipboard.
+      if (data.getRecordCount() === 0 && (await systemPasteboard.hasData())) {
+        throw new Error(
+          "Clipboard contains data but cannot be read; check ohos.permission.READ_PASTEBOARD and the signing profile ACL",
+        );
+      }
       let text: string = "";
       try {
         const primaryText = data.getPrimaryText();
@@ -126,11 +133,6 @@ export class ClipboardPlugin extends AsyncPluginBase {
       if (typeof request.text !== "string") {
         throw new Error("write-text.text must be a string");
       }
-      // NOTE: read-back of the clipboard requires ohos.permission.READ_PASTEBOARD (a
-      // user_grant restricted permission not in the current signing profile's ACL).
-      // Without it, getData() silently returns an empty PasteData (recordCount=0) —
-      // hasData() still returns true, so write-text itself succeeds. See memory
-      // ohos-clipboard-readpasteboard-permission for the full diagnosis.
       const pasteData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, request.text);
       const systemPasteboard = pasteboard.getSystemPasteboard();
       await systemPasteboard.setData(pasteData);
