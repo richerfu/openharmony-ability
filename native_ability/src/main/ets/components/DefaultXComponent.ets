@@ -215,21 +215,22 @@ export struct DefaultXComponent {
 
   build() {
     Stack() {
-      // ContentSlot stays below the plugin tree exactly as before: the XComponent/RS render root
-      // is the base layer, and the session plugin tree overlays it with the legacy transparent
-      // hit-test policy.
+      // ContentSlot is the GPUI input surface. These full-window layout nodes must not take
+      // touches from it. Interactive plugin content blocks the lower layer at its own bounds.
       ContentSlot(this.rootSlot)
       Row() {
         Column() {
           NodeContainer(this.nodeController)
             .height("100%")
             .width("100%")
+            .hitTestBehavior(HitTestMode.None)
         }
         .width("100%")
+        .hitTestBehavior(HitTestMode.None)
         .backgroundColor(Color.Transparent)
       }
       .height("100%")
-      .hitTestBehavior(HitTestMode.Transparent)
+      .hitTestBehavior(HitTestMode.None)
       .backgroundColor(Color.Transparent)
     }.backgroundColor(Color.Transparent);
   }

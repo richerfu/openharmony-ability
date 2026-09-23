@@ -1314,6 +1314,7 @@ function BuildWebview(data: ManagedWebview) {
         .width("100%")
         .height("100%")
         .position({ x: data.style.x ?? 0, y: data.style.y ?? 0 })
+        .hitTestBehavior(HitTestMode.Block)
         .backgroundColor(
           data.transparent === true ? Color.Transparent : (data.style.backgroundColor ?? undefined),
         )
@@ -1382,6 +1383,7 @@ function BuildWebview(data: ManagedWebview) {
       .width("100%")
       .height("100%")
       .position({ x: data.style.x ?? 0, y: data.style.y ?? 0 })
+      .hitTestBehavior(HitTestMode.Block)
       // Transparent windows: force Web background to transparent so vibrancy/blur
       // effects are visible through the Web component. Without this, the Web renders
       // with its default opaque background, hiding any blur effect.

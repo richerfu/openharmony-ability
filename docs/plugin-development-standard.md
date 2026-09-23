@@ -414,6 +414,10 @@ context.appendChild(
 - `context.appendChild(key, node, cleanup)` / `context.removeChild(key)`：key 必须以插件 ID 为前缀
   且在插件内唯一，是插件的清理凭证。session dispose 时 `BridgeHost` 级联卸载并执行 cleanup。
 - 根 `FrameNode` 归 `DefaultXComponent` 所有（`NodeController` 内部状态），UI 消失时由它整树销毁。
+- 覆盖层的全窗口布局容器使用 `HitTestMode.None`，让未被插件内容覆盖的区域继续交给下层
+  XComponent。插件中实际接收触摸的 ArkUI 组件应在自身范围设置
+  `.hitTestBehavior(HitTestMode.Block)`，避免同一次触摸同时触发插件和下层 GPUI；不要把
+  `Block` 放在全窗口容器上，否则会吞掉内容外的触摸。WebView 插件在 `Web` 节点上设置该规则。
 - Rust 通过内置 `ohos.node` 插件以**不透明 u32 句柄**组树（`create-container` / `append-child` /
   `mount-into-root` / `dispose`）；`FrameNode` 值本身不跨 N-API 边界。Rust 可用
   `app.node()?.create_container()` 建容器，把 WebView 等插件节点作为子节点挂进去，再
