@@ -1,4 +1,11 @@
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+};
 
 use napi_ohos::threadsafe_function::ThreadsafeFunctionCallMode::NonBlocking;
 use napi_ohos::{Env, Error, Result};
@@ -19,6 +26,7 @@ use crate::{
 
 const PAN_GESTURE_DISTANCE: f64 = 8.0;
 const SWIPE_GESTURE_MIN_SPEED: f64 = 100.0;
+static NEXT_XCOMPONENT_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Default)]
 struct PanDeltaTracker {
@@ -266,6 +274,15 @@ pub fn render_for_window(
     let mut root = RootNode::new(slot);
     let xcomponent_native =
         XComponent::new().map_err(|e| Error::from_reason(e.reason.to_string()))?;
+    // The native binding's multi_mode registry is keyed by XComponentId.
+    // ArkUI-created native nodes do not get a distinct id automatically, so
+    // every surface must be named before obtaining its native handle.
+    xcomponent_native
+        .set_x_component_id(format!(
+            "ability-xc-{}",
+            NEXT_XCOMPONENT_ID.fetch_add(1, Ordering::Relaxed)
+        ))
+        .map_err(|e| Error::from_reason(e.reason.to_string()))?;
     xcomponent_native
         .background_color(0x0000_0000)
         .map_err(|e| Error::from_reason(e.reason.to_string()))?;
