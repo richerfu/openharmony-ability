@@ -181,7 +181,9 @@ impl FilesExt for OpenHarmonyApp {
                 .call_async::<FilesBridgePlugin, FileDialogOptions, FileDialogResponse>(
                     "file-dialog",
                     options,
-                    BridgeCallOptions::default().with_timeout_ms(60_000),
+                    // A system picker waits for user input; browsing files can legitimately
+                    // take several minutes. Use the bridge's interactive-call limit.
+                    BridgeCallOptions::default().with_timeout_ms(300_000),
                 )
                 .await
         })
