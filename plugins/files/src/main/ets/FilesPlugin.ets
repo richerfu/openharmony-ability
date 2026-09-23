@@ -22,6 +22,7 @@ interface FileDialogOptions {
   dialogType: string;
   allowMany: boolean;
   defaultLocation?: string | null;
+  suggestedName?: string | null;
   filters: FileDialogFilter[];
 }
 
@@ -56,6 +57,12 @@ function parseDialogOptions(payload: BridgeTypedValue): FileDialogOptions {
   }
   if (typeof request.filters !== "object") {
     throw new Error("file-dialog.filters must be an array");
+  }
+  if (request.suggestedName != null) {
+    if (typeof request.suggestedName !== "string" ||
+      request.dialogType !== "save-file" || request.suggestedName.trim().length === 0) {
+      throw new Error("file-dialog.suggestedName requires a save-file dialog and a non-empty name");
+    }
   }
   return request;
 }
@@ -108,6 +115,9 @@ async function showFileDialog(
   if (options.dialogType === "save-file") {
     const saveOptions = new picker.DocumentSaveOptions();
     saveOptions.defaultFilePathUri = location;
+    if (options.suggestedName) {
+      saveOptions.newFileNames = [options.suggestedName];
+    }
     saveOptions.fileSuffixChoices = suffixFilters;
     const files = await documentPicker.save(saveOptions);
     let filter = -1;
