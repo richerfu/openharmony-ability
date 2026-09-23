@@ -5,9 +5,11 @@ import {
   BridgeContextRequirement,
 } from "@ohos-rs/ability";
 import Want from "@ohos.app.ability.Want";
+import { wantConstant } from "@kit.AbilityKit";
 
 const OPEN_REQUEST_TYPE = "ohos.url.OpenRequest";
 const REVEAL_REQUEST_TYPE = "ohos.url.RevealRequest";
+const OPEN_FILE_REQUEST_TYPE = "ohos.url.OpenFileRequest";
 const OPEN_RESPONSE_TYPE = "ohos.url.OpenResponse";
 
 interface UrlOpenRequest {
@@ -16,6 +18,10 @@ interface UrlOpenRequest {
 
 interface UrlRevealRequest {
   path: string;
+}
+
+interface UrlOpenFileRequest {
+  uri: string;
 }
 
 // Public-directory path forms an app may hold, all mapping into the
@@ -175,6 +181,26 @@ export class UrlPlugin extends AsyncPluginBase {
     payload: BridgeTypedValue,
     context: BridgeCallContext,
   ): Promise<BridgeTypedValue> {
+    if (action === "open-file") {
+      if (payload.typeName !== OPEN_FILE_REQUEST_TYPE || typeof payload.value !== "object") {
+        throw new Error(`ohos.url.open-file requires bridge type ${OPEN_FILE_REQUEST_TYPE}`);
+      }
+      const request = payload.value as UrlOpenFileRequest;
+      if (typeof request.uri !== "string" || !request.uri.startsWith("file://")) {
+        throw new Error("open-file.uri must be a file:// URI");
+      }
+      const want: Want = {
+        action: "ohos.want.action.viewData",
+        uri: request.uri,
+        flags: wantConstant.Flags.FLAG_AUTH_READ_URI_PERMISSION,
+      };
+      await context.abilityContext.startAbility(want);
+      if (!context.isActive()) {
+        throw new Error("Ability was destroyed while the file was being opened");
+      }
+      return { typeName: OPEN_RESPONSE_TYPE, value: new UrlOpenResponse(true) };
+    }
+
     if (action === "open-url") {
       const request = parseOpenRequest(payload);
       try {

@@ -37,6 +37,7 @@ const TITLE_REQUEST_TYPE = "ohos.window.TitleRequest";
 const LIMITS_REQUEST_TYPE = "ohos.window.LimitsRequest";
 const IME_POSITION_REQUEST_TYPE = "ohos.window.ImePositionRequest";
 const DRAGGABLE_REQUEST_TYPE = "ohos.window.DraggableRequest";
+const KEEP_SCREEN_ON_REQUEST_TYPE = "ohos.window.KeepScreenOnRequest";
 const CURSOR_ICON_REQUEST_TYPE = "ohos.window.CursorIconRequest";
 const CURSOR_VISIBLE_REQUEST_TYPE = "ohos.window.CursorVisibleRequest";
 const DECORATION_FLAGS_REQUEST_TYPE = "ohos.window.DecorationFlagsRequest";
@@ -147,6 +148,11 @@ interface ImePositionRequest {
 interface WindowDraggableRequest {
   windowId: number;
   enable: boolean;
+}
+
+interface WindowKeepScreenOnRequest {
+  windowId: number;
+  on: boolean;
 }
 
 interface CursorIconRequest {
@@ -467,6 +473,19 @@ function parseDraggableRequest(payload: BridgeTypedValue): WindowDraggableReques
   return request;
 }
 
+function parseKeepScreenOnRequest(payload: BridgeTypedValue): WindowKeepScreenOnRequest {
+  if (payload.typeName !== KEEP_SCREEN_ON_REQUEST_TYPE || typeof payload.value !== "object") {
+    throw new Error(
+      `ohos.window.set-keep-screen-on requires bridge type ${KEEP_SCREEN_ON_REQUEST_TYPE}`,
+    );
+  }
+  const request = payload.value as WindowKeepScreenOnRequest;
+  if (!isWindowId(request?.windowId) || typeof request.on !== "boolean") {
+    throw new Error("set-keep-screen-on requires a valid windowId and boolean on");
+  }
+  return request;
+}
+
 function parseCursorIconRequest(payload: BridgeTypedValue): CursorIconRequest {
   if (payload.typeName !== CURSOR_ICON_REQUEST_TYPE || typeof payload.value !== "object") {
     throw new Error(`ohos.window.set-cursor-icon requires bridge type ${CURSOR_ICON_REQUEST_TYPE}`);
@@ -762,43 +781,43 @@ export class WindowPlugin extends AsyncPluginBase {
       const doPublish = async (retry: boolean): Promise<void> => {
         try {
           await notificationManager.publish(notification);
-            hilog.info(
-              DOMAIN,
-              TAG,
-              "request-user-attention: published OK (id=%{public}d, window=%{public}d)",
-              notifId,
-              request.windowId,
-            );
+          hilog.info(
+            DOMAIN,
+            TAG,
+            "request-user-attention: published OK (id=%{public}d, window=%{public}d)",
+            notifId,
+            request.windowId,
+          );
         } catch (err) {
-            const code = (err as BusinessError).code ?? -1;
-            hilog.warn(
-              DOMAIN,
-              TAG,
-              "request-user-attention: publish failed id=%{public}d code=%{public}s",
-              notifId,
-              String(code),
-            );
-            // 1600004 = notification not enabled → pop the system authorization
-            // dialog (requestEnableNotification) and retry once.
-            if (code === 1600004 && !retry) {
-              try {
-                await notificationManager.requestEnableNotification(context.abilityContext);
-                  hilog.info(
-                    DOMAIN,
-                    TAG,
-                    "request-user-attention: enabled, retry publish (id=%{public}d)",
-                    notifId,
-                  );
-                  await doPublish(true);
-              } catch (e2) {
-                  hilog.warn(
-                    DOMAIN,
-                    TAG,
-                    "request-user-attention: requestEnableNotification failed: %{public}s",
-                    JSON.stringify(e2),
-                  );
-              }
+          const code = (err as BusinessError).code ?? -1;
+          hilog.warn(
+            DOMAIN,
+            TAG,
+            "request-user-attention: publish failed id=%{public}d code=%{public}s",
+            notifId,
+            String(code),
+          );
+          // 1600004 = notification not enabled → pop the system authorization
+          // dialog (requestEnableNotification) and retry once.
+          if (code === 1600004 && !retry) {
+            try {
+              await notificationManager.requestEnableNotification(context.abilityContext);
+              hilog.info(
+                DOMAIN,
+                TAG,
+                "request-user-attention: enabled, retry publish (id=%{public}d)",
+                notifId,
+              );
+              await doPublish(true);
+            } catch (e2) {
+              hilog.warn(
+                DOMAIN,
+                TAG,
+                "request-user-attention: requestEnableNotification failed: %{public}s",
+                JSON.stringify(e2),
+              );
             }
+          }
         }
       };
       void doPublish(false);
@@ -867,6 +886,17 @@ export class WindowPlugin extends AsyncPluginBase {
       } catch (error) {
         throw new Error(`set-draggable failed: ${String(error)}`);
       }
+    }
+
+    if (action === "set-keep-screen-on") {
+      const request = parseKeepScreenOnRequest(payload);
+      const win = WindowManager.getInstance().getWindow(request.windowId);
+      if (!win) {
+        throw new Error(`set-keep-screen-on: window ${request.windowId} not found`);
+      }
+      await win.setWindowKeepScreenOn(request.on);
+      this.assertCallActive(context);
+      return { typeName: ACKNOWLEDGEMENT_TYPE, value: new BridgeAcknowledgement(true) };
     }
 
     if (action === "get-real-window-id") {

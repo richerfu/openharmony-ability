@@ -11,6 +11,9 @@ import {
 
 const READ_TEXT_REQUEST_TYPE = "ohos.clipboard.ReadTextRequest";
 const READ_TEXT_RESPONSE_TYPE = "ohos.clipboard.ReadTextResponse";
+const READ_CONTENT_RESPONSE_TYPE = "ohos.clipboard.ReadContentResponse";
+const WRITE_ENCODED_IMAGE_REQUEST_TYPE = "ohos.clipboard.WriteEncodedImageRequest";
+const WRITE_URIS_REQUEST_TYPE = "ohos.clipboard.WriteUrisRequest";
 const WRITE_TEXT_REQUEST_TYPE = "ohos.clipboard.WriteTextRequest";
 const WRITE_TEXT_RESPONSE_TYPE = "ohos.clipboard.WriteTextResponse";
 const WRITE_IMAGE_REQUEST_TYPE = "ohos.clipboard.WriteImageRequest";
@@ -22,6 +25,26 @@ const CLEAR_RESPONSE_TYPE = "ohos.clipboard.ClearResponse";
 
 interface WriteTextRequest {
   text: string;
+}
+
+interface WriteEncodedImageRequest {
+  bytes: Uint8Array | number[];
+}
+
+interface WriteUrisRequest {
+  uris: string[];
+}
+
+class ReadContentResponse {
+  readonly text?: string;
+  readonly png?: number[];
+  readonly uris: string[];
+
+  constructor(text: string | undefined, png: number[] | undefined, uris: string[]) {
+    this.text = text;
+    this.png = png;
+    this.uris = uris;
+  }
 }
 
 interface WriteImageRequest {
@@ -87,6 +110,104 @@ export class ClipboardPlugin extends AsyncPluginBase {
   ): Promise<BridgeTypedValue> {
     if (!context.isActive()) {
       throw new Error("Bridge session is no longer active");
+    }
+
+    if (action === "read-content") {
+      expectBridgeRequestType(payload, "ohos.clipboard", action, READ_TEXT_REQUEST_TYPE);
+      const systemPasteboard = pasteboard.getSystemPasteboard();
+      const data = await systemPasteboard.getData();
+      if (data.getRecordCount() === 0 && (await systemPasteboard.hasData())) {
+        throw new Error("Clipboard data is unreadable; check READ_PASTEBOARD signing profile ACL");
+      }
+      const mimeTypes = data.getMimeTypes();
+      let text: string | undefined;
+      let png: number[] | undefined;
+      const uris: string[] = [];
+      if (mimeTypes.includes(pasteboard.MIMETYPE_TEXT_PLAIN)) {
+        text = data.getPrimaryText() || undefined;
+      }
+      if (mimeTypes.includes(pasteboard.MIMETYPE_TEXT_URI)) {
+        for (let index = 0; index < data.getRecordCount(); index++) {
+          const uri = data.getRecordAt(index).uri;
+          if (typeof uri === "string" && uri.length > 0) {
+            uris.push(uri);
+          }
+        }
+      }
+      if (mimeTypes.includes(pasteboard.MIMETYPE_PIXELMAP)) {
+        const pixelMap = data.getPrimaryPixelMap();
+        if (pixelMap) {
+          const packer = image.createImagePacker();
+          try {
+            const encoded = await packer.packToData(pixelMap, {
+              format: "image/png",
+              quality: 100,
+            });
+            png = Array.from(new Uint8Array(encoded));
+          } finally {
+            packer.release();
+          }
+        }
+      }
+      return {
+        typeName: READ_CONTENT_RESPONSE_TYPE,
+        value: new ReadContentResponse(text, png, uris),
+      };
+    }
+
+    if (action === "write-encoded-image") {
+      const request = expectBridgeRequestType(
+        payload,
+        "ohos.clipboard",
+        action,
+        WRITE_ENCODED_IMAGE_REQUEST_TYPE,
+      ) as WriteEncodedImageRequest;
+      const bytes =
+        request.bytes instanceof Uint8Array ? request.bytes : new Uint8Array(request.bytes);
+      if (bytes.length === 0) {
+        throw new Error("write-encoded-image.bytes must not be empty");
+      }
+      const copy = new Uint8Array(bytes.length);
+      copy.set(bytes);
+      const source = image.createImageSource(copy.buffer);
+      try {
+        const pixelMap = await source.createPixelMap();
+        try {
+          await pasteboard
+            .getSystemPasteboard()
+            .setData(pasteboard.createData(pasteboard.MIMETYPE_PIXELMAP, pixelMap));
+        } finally {
+          pixelMap.release();
+        }
+      } finally {
+        source.release();
+      }
+      return {
+        typeName: WRITE_IMAGE_RESPONSE_TYPE,
+        value: new WriteImageResponse(true),
+      };
+    }
+
+    if (action === "write-uris") {
+      const request = expectBridgeRequestType(
+        payload,
+        "ohos.clipboard",
+        action,
+        WRITE_URIS_REQUEST_TYPE,
+      ) as WriteUrisRequest;
+      if (
+        !Array.isArray(request.uris) ||
+        request.uris.length === 0 ||
+        request.uris.some((uri) => typeof uri !== "string" || !uri.startsWith("file://"))
+      ) {
+        throw new Error("write-uris.uris must contain file:// URIs");
+      }
+      const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_URI, request.uris[0]);
+      for (let index = 1; index < request.uris.length; index++) {
+        data.addRecord(pasteboard.MIMETYPE_TEXT_URI, request.uris[index]);
+      }
+      await pasteboard.getSystemPasteboard().setData(data);
+      return { typeName: WRITE_TEXT_RESPONSE_TYPE, value: new WriteTextResponse(true) };
     }
 
     if (action === "read-text") {
@@ -236,7 +357,7 @@ export class ClipboardPlugin extends AsyncPluginBase {
     } catch (e) {
       const err = e as BusinessError;
       console.error(`[Clipboard] writeImageToClipboard failed: ${err.code} ${err.message}`);
-      throw new Error(`writeImageToClipboard failed: code=${err.code} msg=${err.message}`);
+      throw e;
     } finally {
       pm?.release();
     }

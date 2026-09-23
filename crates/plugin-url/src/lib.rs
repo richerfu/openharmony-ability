@@ -64,6 +64,14 @@ pub struct UrlRevealRequest {
 
 impl_bridge_napi_type!(UrlRevealRequest, "ohos.url.RevealRequest");
 
+#[napi(object)]
+#[derive(Clone, Debug)]
+pub struct UrlOpenFileRequest {
+    pub uri: String,
+}
+
+impl_bridge_napi_type!(UrlOpenFileRequest, "ohos.url.OpenFileRequest");
+
 fn validate_path(path: &str) -> Result<()> {
     if path.trim().is_empty() {
         return Err(Error::from_reason("path must not be empty"));
@@ -88,6 +96,9 @@ pub trait UrlExt {
     /// Opens an external URL through the system link opener.
     fn open_url(&self, url: impl Into<String>) -> Pin<Box<dyn Future<Output = Result<()>> + Send>>;
 
+    fn open_file(&self, uri: impl Into<String>)
+        -> Pin<Box<dyn Future<Output = Result<()>> + Send>>;
+
     /// Reveals a directory in the system file manager. `path` must be the
     /// absolute **real filesystem path** of the directory (the file's parent),
     /// not a `file://` URI — the ArkTS side maps it to the file-manager
@@ -110,6 +121,27 @@ impl UrlExt for OpenHarmonyApp {
                 .call_async::<UrlBridgePlugin, UrlOpenRequest, UrlOpenResponse>(
                     "open-url",
                     UrlOpenRequest { url },
+                    BridgeCallOptions::default(),
+                )
+                .await?;
+            response.ensure()
+        })
+    }
+
+    fn open_file(
+        &self,
+        uri: impl Into<String>,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> {
+        let uri = uri.into();
+        if !uri.starts_with("file://") {
+            return Box::pin(async { Err(Error::from_reason("open_file requires a file:// URI")) });
+        }
+        let bridge = self.bridge();
+        Box::pin(async move {
+            let response = bridge?
+                .call_async::<UrlBridgePlugin, UrlOpenFileRequest, UrlOpenResponse>(
+                    "open-file",
+                    UrlOpenFileRequest { uri },
                     BridgeCallOptions::default(),
                 )
                 .await?;

@@ -263,6 +263,15 @@ impl_bridge_napi_type!(WindowDraggableRequest, "ohos.window.DraggableRequest");
 
 #[napi(object)]
 #[derive(Clone, Debug)]
+pub struct WindowKeepScreenOnRequest {
+    pub window_id: i64,
+    pub on: bool,
+}
+
+impl_bridge_napi_type!(WindowKeepScreenOnRequest, "ohos.window.KeepScreenOnRequest");
+
+#[napi(object)]
+#[derive(Clone, Debug)]
 pub struct CursorIconRequest {
     pub window_id: i64,
     /// PointerStyle id as understood by WindowManager.setPointerStyle.
@@ -659,6 +668,16 @@ impl WindowClient {
         self.call::<WindowDraggableRequest, WindowAcknowledgement>(
             "set-draggable",
             WindowDraggableRequest { window_id, enable },
+        )
+        .await?
+        .ensure()
+    }
+
+    pub async fn set_keep_screen_on(&self, window_id: i64, on: bool) -> Result<()> {
+        validate_window_id(window_id)?;
+        self.call::<WindowKeepScreenOnRequest, WindowAcknowledgement>(
+            "set-keep-screen-on",
+            WindowKeepScreenOnRequest { window_id, on },
         )
         .await?
         .ensure()

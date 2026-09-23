@@ -36,6 +36,38 @@ pub struct ClipboardReadTextResponse {
 
 impl_bridge_napi_type!(ClipboardReadTextResponse, "ohos.clipboard.ReadTextResponse");
 
+#[napi(object)]
+#[derive(Clone, Debug, Default)]
+pub struct ClipboardReadContentResponse {
+    pub text: Option<String>,
+    pub png: Option<Vec<u8>>,
+    pub uris: Vec<String>,
+}
+
+impl_bridge_napi_type!(
+    ClipboardReadContentResponse,
+    "ohos.clipboard.ReadContentResponse"
+);
+
+#[napi(object)]
+#[derive(Clone, Debug)]
+pub struct ClipboardWriteEncodedImageRequest {
+    pub bytes: Vec<u8>,
+}
+
+impl_bridge_napi_type!(
+    ClipboardWriteEncodedImageRequest,
+    "ohos.clipboard.WriteEncodedImageRequest"
+);
+
+#[napi(object)]
+#[derive(Clone, Debug)]
+pub struct ClipboardWriteUrisRequest {
+    pub uris: Vec<String>,
+}
+
+impl_bridge_napi_type!(ClipboardWriteUrisRequest, "ohos.clipboard.WriteUrisRequest");
+
 // ── write-text ──────────────────────────────────────────────────────────────────
 
 #[napi(object)]
@@ -157,6 +189,56 @@ impl ClipboardClient {
             )
             .await?;
         Ok(response.text)
+    }
+
+    pub async fn read_content(&self) -> Result<ClipboardReadContentResponse> {
+        self.call::<ClipboardReadTextRequest, ClipboardReadContentResponse>(
+            "read-content",
+            ClipboardReadTextRequest {},
+        )
+        .await
+    }
+
+    pub async fn write_encoded_image(&self, bytes: &[u8]) -> Result<()> {
+        if bytes.is_empty() {
+            return Err(Error::from_reason(
+                "clipboard image bytes must not be empty",
+            ));
+        }
+        let response = self
+            .call::<ClipboardWriteEncodedImageRequest, ClipboardWriteImageResponse>(
+                "write-encoded-image",
+                ClipboardWriteEncodedImageRequest {
+                    bytes: bytes.to_vec(),
+                },
+            )
+            .await?;
+        if response.accepted {
+            Ok(())
+        } else {
+            Err(Error::from_reason(
+                "Clipboard plugin rejected encoded image",
+            ))
+        }
+    }
+
+    pub async fn write_uris(&self, uris: Vec<String>) -> Result<()> {
+        if uris.is_empty() || uris.iter().any(|uri| !uri.starts_with("file://")) {
+            return Err(Error::from_reason(
+                "clipboard URIs must be non-empty file:// URIs",
+            ));
+        }
+        let response = self
+            .call::<ClipboardWriteUrisRequest, ClipboardWriteTextResponse>(
+                "write-uris",
+                ClipboardWriteUrisRequest { uris },
+            )
+            .await?;
+        if response.accepted {
+            Ok(())
+        } else {
+            Err(Error::from_reason("Clipboard plugin rejected URIs"))
+        }
     }
 
     /// Writes text to the system clipboard.

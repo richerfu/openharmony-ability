@@ -36,6 +36,7 @@ impl Debug for InputEvent {
 pub enum XComponentInputEvent {
     Key(KeyEventData),
     Mouse(MouseEventData),
+    Hover(bool),
     Touch(TouchEventData),
 }
 
@@ -198,6 +199,8 @@ pub struct SwipeGestureEvent {
 #[derive(Clone)]
 pub enum ImeEvent {
     TextInputEvent(TextInputEventData),
+    PreviewTextEvent { text: String, start: i32, end: i32 },
+    FinishPreviewEvent,
     BackspaceEvent(i32),
     ImeStatusEvent(KeyboardStatus),
     EnterEvent(i32),
@@ -207,6 +210,10 @@ impl Debug for ImeEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ImeEvent::TextInputEvent(data) => write!(f, "TextInputEvent: {:?}", data),
+            ImeEvent::PreviewTextEvent { text, start, end } => {
+                write!(f, "PreviewTextEvent: {text:?} ({start}..{end})")
+            }
+            ImeEvent::FinishPreviewEvent => write!(f, "FinishPreviewEvent"),
             ImeEvent::BackspaceEvent(len) => write!(f, "BackspaceEvent: delete length is {}", len),
             ImeEvent::ImeStatusEvent(status) => write!(f, "ImeStatusEvent: {:?}", status),
             ImeEvent::EnterEvent(key) => write!(f, "EnterEvent: {:?}", key),

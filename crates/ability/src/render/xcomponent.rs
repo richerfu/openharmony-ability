@@ -293,11 +293,15 @@ pub fn render_for_window(
         on_ime_hide_callback_tsfn,
         on_backspace_callback_tsfn,
         on_ime_enter_callback_tsfn,
+        preview_callback_tsfn,
+        finish_callback_tsfn,
     ) = input::ime_ts_fn(env, app.clone(), render_owner.clone())?;
     let insert_text_callback_tsfn = Arc::new(insert_text_callback_tsfn);
     let on_ime_hide_callback_tsfn = Arc::new(on_ime_hide_callback_tsfn);
     let on_backspace_callback_tsfn = Arc::new(on_backspace_callback_tsfn);
     let on_ime_enter_callback_tsfn = Arc::new(on_ime_enter_callback_tsfn);
+    let preview_callback_tsfn = Arc::new(preview_callback_tsfn);
+    let finish_callback_tsfn = Arc::new(finish_callback_tsfn);
 
     xcomponent.on_surface_created(move |xc_raw, win| {
         // NDK callback boundary: a panic here aborts the process (no unwinding
@@ -336,6 +340,8 @@ pub fn render_for_window(
             let on_ime_hide_callback_tsfn = on_ime_hide_callback_tsfn.clone();
             let on_backspace_callback_tsfn = on_backspace_callback_tsfn.clone();
             let on_ime_enter_callback_tsfn = on_ime_enter_callback_tsfn.clone();
+            let preview_callback_tsfn = preview_callback_tsfn.clone();
+            let finish_callback_tsfn = finish_callback_tsfn.clone();
 
             // // run in other thread
             ime.insert_text(move |s| {
@@ -349,6 +355,15 @@ pub fn render_for_window(
             });
             ime.on_enter(move |key| {
                 on_ime_enter_callback_tsfn.call(key as i32, NonBlocking);
+            });
+            ime.on_preview(move |text, start, end| {
+                preview_callback_tsfn.call(
+                    input::PreviewTextEventData { text, start, end },
+                    NonBlocking,
+                );
+            });
+            ime.on_finish_preview(move || {
+                finish_callback_tsfn.call(true, NonBlocking);
             });
         }
 
@@ -489,6 +504,16 @@ pub fn render_for_window(
             &on_mouse_event_app,
             &on_mouse_event_owner,
             InputEvent::XComponent(XComponentInputEvent::Mouse(data)),
+        );
+        Ok(())
+    })?;
+    let on_hover_event_app = app.clone();
+    let on_hover_event_owner = render_owner.clone();
+    xcomponent.on_hover_event(move |_, hovered| {
+        dispatch_input(
+            &on_hover_event_app,
+            &on_hover_event_owner,
+            InputEvent::XComponent(XComponentInputEvent::Hover(hovered)),
         );
         Ok(())
     })?;
