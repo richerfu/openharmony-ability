@@ -210,7 +210,9 @@ fn build_create_sub_window_args(
     if let Some(module_name) = native_module_name {
         config.set("nativeModuleName", module_name)?;
     }
-    config.set("windowId", window_id)?;
+    let arkts_window_id = u32::try_from(window_id)
+        .map_err(|_| Error::from_reason("Sub-window ID exceeds ArkTS window ID range"))?;
+    config.set("windowId", arkts_window_id)?;
     config.set("width", width)?;
     config.set("height", height)?;
     config.set("x", x)?;
