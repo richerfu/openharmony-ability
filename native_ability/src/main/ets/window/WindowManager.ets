@@ -22,6 +22,11 @@ import { WindowAttachmentRegistry } from "./WindowAttachmentRegistry";
 // existing importers (`import {...} from "../window/WindowManager"`) keep working.
 export { WindowRectEventWrap, WindowSizeEventWrap } from "./RectThrottle";
 
+export interface WindowFocusEventWrap {
+  windowId: number;
+  focused: boolean;
+}
+
 interface WindowEntry {
   window: window.Window;
   storage?: LocalStorage;
@@ -122,6 +127,7 @@ export class WindowManager {
   // wrapped options carry the windowId (main window = 0, sub-window = the createSubWindow
   // windowId parameter).
   private rectChangeCallback?: (options: WindowRectEventWrap) => void;
+  private focusChangeCallback?: (options: WindowFocusEventWrap) => void;
 
   private constructor(context: common.UIAbilityContext) {
     this.context = context;
@@ -337,6 +343,9 @@ export class WindowManager {
         this.lastFocusedWindow = win;
         this.lastFocusedWindowId = windowId;
         hilog.info(DOMAIN, "WindowManager", "Last focused window updated: id=%{public}d", windowId);
+        this.focusChangeCallback?.({ windowId, focused: true });
+      } else if (eventType === window.WindowEventType.WINDOW_INACTIVE) {
+        this.focusChangeCallback?.({ windowId, focused: false });
       }
 
       // Consume pending action when system foreground transition completes
@@ -1863,6 +1872,14 @@ export class WindowManager {
    *  forwards to every lifecycle.windowStageEventCallback.onWindowRectChange. */
   registerRectChangeCallback(cb: (options: WindowRectEventWrap) => void): void {
     this.rectChangeCallback = cb;
+  }
+
+  registerFocusChangeCallback(cb: (options: WindowFocusEventWrap) => void): void {
+    this.focusChangeCallback = cb;
+  }
+
+  unregisterFocusChangeCallback(): void {
+    this.focusChangeCallback = undefined;
   }
 
   unregisterRectChangeCallback(): void {

@@ -20,7 +20,12 @@ import {
   Module,
 } from "./type";
 import { getMenuBarPort } from "../components/MenuBarSlot";
-import { WindowManager, WindowSizeEventWrap, WindowRectEventWrap } from "../window/WindowManager";
+import {
+  WindowManager,
+  WindowSizeEventWrap,
+  WindowRectEventWrap,
+  WindowFocusEventWrap,
+} from "../window/WindowManager";
 import { DOMAIN, MAIN_WINDOW_ID, NATIVE_MODULE_STORAGE_KEY } from "../helper/constants";
 import { ProcessInitializer } from "./ProcessInitializer";
 
@@ -532,6 +537,11 @@ export class NativeAbility extends UIAbility {
           lifecycle.windowStageEventCallback.onWindowRectChange(wrapped),
         );
       });
+      WindowManager.getInstance().registerFocusChangeCallback((wrapped: WindowFocusEventWrap) => {
+        this.forEachLifecycle((lifecycle) =>
+          lifecycle.windowStageEventCallback.onWindowFocusChange(wrapped),
+        );
+      });
 
       try {
         this.observedWindowStage = windowStage;
@@ -761,6 +771,7 @@ export class NativeAbility extends UIAbility {
   }
 
   private detachWindowListeners(): void {
+    WindowManager.getInstance().unregisterFocusChangeCallback();
     const windowStage = this.observedWindowStage;
     this.observedWindowStage = undefined;
     if (windowStage !== undefined) {

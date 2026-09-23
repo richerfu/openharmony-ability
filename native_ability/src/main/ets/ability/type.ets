@@ -54,6 +54,7 @@ export interface WindowStageEventCallback {
   onWindowStageEvent: (arg: number) => void;
   onWindowSizeChange: (arg: object) => void;
   onWindowRectChange: (arg: object) => void;
+  onWindowFocusChange: (arg: object) => void;
   onAvoidAreaChange: (arg: object) => void;
   onNewWant: (data: NewWantData) => void;
 }

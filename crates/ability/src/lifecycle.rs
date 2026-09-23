@@ -28,6 +28,7 @@ pub struct WindowStageEventCallback<'a> {
     pub on_window_stage_event: Function<'a, i32, ()>,
     pub on_window_size_change: Function<'a, Object<'a>, ()>,
     pub on_window_rect_change: Function<'a, Object<'a>, ()>,
+    pub on_window_focus_change: Function<'a, Object<'a>, ()>,
     pub on_avoid_area_change: Function<'a, Object<'a>, ()>,
     pub on_new_want: Function<'a, Object<'a>, ()>,
     pub on_ability_create_with_want: Function<'a, Object<'a>, ()>,
@@ -218,6 +219,18 @@ pub fn create_lifecycle_handle<'a>(
             Ok(())
         })?;
 
+    let window_focus_app = app.clone();
+    let window_focus_change =
+        env.create_function_from_closure("window_focus_change", move |ctx| {
+            let options = ctx.first_arg::<Object>()?;
+            let window_id = options.get_named_property::<i64>("windowId")?;
+            let focused = options.get_named_property::<bool>("focused")?;
+            if let Some(ref mut handler) = *window_focus_app.event_loop.borrow_mut() {
+                handler(Event::WindowFocusChanged { window_id, focused });
+            }
+            Ok(())
+        })?;
+
     let avoid_area_change_app = app.clone();
     let avoid_area_change = env.create_function_from_closure("avoid_area_change", move |ctx| {
         let options = ctx.first_arg::<Object>()?;
@@ -380,6 +393,7 @@ pub fn create_lifecycle_handle<'a>(
             on_ability_save_state,
             on_ability_restore_state,
             on_window_rect_change: window_rect_change,
+            on_window_focus_change: window_focus_change,
             on_window_size_change: window_resize,
             on_avoid_area_change: avoid_area_change,
             on_window_stage_event: window_stage_event,

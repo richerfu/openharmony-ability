@@ -64,6 +64,11 @@ pub enum Event<'a> {
     /// window stage unfocus event
     /// alias WindowStageEventType.INAVTIVE
     LostFocus,
+    /// Focus change for a specific OHOS window (0 = main window).
+    WindowFocusChanged {
+        window_id: i64,
+        focused: bool,
+    },
     /// window resume
     /// alias WindowStageEventType.RESUMED
     Resume(SaveLoader<'a>),
@@ -135,6 +140,7 @@ impl<'a> Event<'a> {
             Event::Start => "Start",
             Event::GainedFocus => "GainedFocus",
             Event::LostFocus => "LostFocus",
+            Event::WindowFocusChanged { .. } => "WindowFocusChanged",
             Event::Resume(_) => "Resume",
             Event::Pause => "Pause",
             Event::Stop => "Stop",
