@@ -386,6 +386,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451"
 
 [[package]]
+name = "ohos-accessibility-binding"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9a8980b8d4e16cc38d2659a8c109c4b345c4187a916523112344d0a7b2dfe6d"
+dependencies = [
+ "bitflags 2.13.2",
+ "ohos-accessibility-sys",
+ "ohos-arkui-input-sys",
+ "ohos-enum-derive",
+]
+
+[[package]]
 name = "ohos-accessibility-sys"
 version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -648,14 +660,14 @@ dependencies = [
 [[package]]
 name = "ohos-xcomponent-binding"
 version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49b6ca25d8e9a5ff34c4974a923b41c37e9a1c2bab526e97b0bfc28318dbe0d3"
 dependencies = [
  "napi-derive-ohos",
  "napi-ohos",
  "napi-sys-ohos",
+ "ohos-accessibility-binding",
  "ohos-arkui-input-binding",
  "ohos-enum-derive",
+ "ohos-hilog-binding",
  "ohos-xcomponent-sys",
  "raw-window-handle",
 ]
