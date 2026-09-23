@@ -16,7 +16,7 @@ use ohos_arkui_binding::types::{
 };
 use ohos_arkui_binding::{ArkUIHandle, RootNode, XComponent};
 use ohos_ime_binding::IME;
-use ohos_xcomponent_binding::{XComponentOffset, XComponentSize};
+use ohos_xcomponent_binding::{NativeXComponent, XComponentOffset, XComponentRaw, XComponentSize};
 
 use crate::{
     input, set_main_thread_env, ArkUiInputEvent, AxisEventData, Event, GestureEvent, GesturePhase,
@@ -277,7 +277,10 @@ pub fn render_for_window(
     // The native binding's multi_mode registry is keyed by XComponentId.
     // ArkUI-created native nodes do not get a distinct id automatically, so
     // every surface must be named before obtaining its native handle.
-    crate::warn!("native XComponent before id: {:?}", xcomponent_native.native_xcomponent().id());
+    crate::warn!(
+        "native XComponent before id: {:?}",
+        xcomponent_native.native_xcomponent().id()
+    );
     xcomponent_native
         .set_x_component_id(format!(
             "ability-xc-{}",
@@ -287,12 +290,22 @@ pub fn render_for_window(
             crate::warn!("native XComponent set id failed: {e:?}");
             Error::from_reason(e.reason.to_string())
         })?;
-    crate::warn!("native XComponent after id: {:?}", xcomponent_native.native_xcomponent().id());
+    crate::warn!(
+        "native XComponent after id: {:?}",
+        xcomponent_native.native_xcomponent().id()
+    );
+    crate::warn!(
+        "native XComponent actual id: {:?}",
+        NativeXComponent::new(XComponentRaw(xcomponent_native.native_xcomponent().raw())).id()
+    );
     xcomponent_native
         .background_color(0x0000_0000)
         .map_err(|e| Error::from_reason(e.reason.to_string()))?;
 
-    let xcomponent = xcomponent_native.native_xcomponent();
+    // ArkUI's helper caches an empty XComponentId for a not-yet-mounted native
+    // node. Ask the NDK handle for its current id after assigning it instead.
+    let xcomponent =
+        NativeXComponent::new(XComponentRaw(xcomponent_native.native_xcomponent().raw()));
 
     let touch_input_delivery =
         app.begin_render(&render_owner, window_id, xcomponent_native.clone())?;

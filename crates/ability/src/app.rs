@@ -19,7 +19,7 @@ use ohos_display_binding::{
     default_display_width,
 };
 use ohos_ime_binding::IME;
-use ohos_xcomponent_binding::RawWindow;
+use ohos_xcomponent_binding::{NativeXComponent, RawWindow, XComponentRaw};
 
 use crate::{
     bridge::MainThreadBridgeEndpoint, AvoidArea, AvoidAreaType, BridgeMainThread,
@@ -31,6 +31,10 @@ use crate::{
 static ID: AtomicI64 = AtomicI64::new(0);
 
 pub(crate) static HAS_EVENT: AtomicBool = AtomicBool::new(false);
+
+fn native_xcomponent_for(node: &XComponent) -> NativeXComponent {
+    NativeXComponent::new(XComponentRaw(node.native_xcomponent().raw()))
+}
 
 #[derive(Clone, Default)]
 struct RenderGestures {
@@ -259,10 +263,7 @@ impl OpenHarmonyAppInner {
         if let Some(xcomponent) = self.xcomponent.as_ref() {
             // Callable from embedding apps; a failure here must not abort the
             // process (issue #87 minor-2 — this used to .expect).
-            if let Err(e) = xcomponent
-                .native_xcomponent()
-                .set_frame_rate(min, max, expected)
-            {
+            if let Err(e) = native_xcomponent_for(xcomponent).set_frame_rate(min, max, expected) {
                 crate::warn!("set_frame_rate({min}, {max}, {expected}) failed: {e:?}");
             }
         }
@@ -358,7 +359,7 @@ impl OpenHarmonyAppInner {
         let surface_was_active = self.surface_active;
         self.render_gestures.release(self.xcomponent.as_ref());
         if let Some(xcomponent) = self.xcomponent.as_ref() {
-            xcomponent.native_xcomponent().unregister_callbacks();
+            native_xcomponent_for(xcomponent).unregister_callbacks();
         }
         self.render_owner = None;
         self.surface_active = false;
@@ -907,10 +908,7 @@ impl OpenHarmonyApp {
                     .find_map(|(id, surface)| (surface.owner == owner).then_some(*id))?;
                 let surface = inner.sub_surfaces.remove(&id)?;
                 surface.gestures.release(Some(&surface.xcomponent));
-                surface
-                    .xcomponent
-                    .native_xcomponent()
-                    .unregister_callbacks();
+                native_xcomponent_for(&surface.xcomponent).unregister_callbacks();
                 inner.window_rects.remove(&id);
                 Some((id, surface.active))
             }
