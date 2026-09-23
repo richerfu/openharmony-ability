@@ -60,10 +60,6 @@ pub fn ime_ts_fn(env: &Env, app: OpenHarmonyApp, render_owner: String) -> Result
             };
 
             let status = KeyboardStatus::from(value);
-            if matches!(status, KeyboardStatus::Hide) {
-                // Keep native IME lifecycle aligned with hide callbacks.
-                on_ime_hide_app.hide_keyboard();
-            }
             if let Some(ref mut h) = *on_ime_hide_app.event_loop.borrow_mut() {
                 h(Event::Input(InputEvent::Ime(ImeEvent::ImeStatusEvent(
                     status,
