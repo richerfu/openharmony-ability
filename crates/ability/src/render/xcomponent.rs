@@ -269,6 +269,12 @@ pub fn render_for_window(
     xcomponent_native
         .background_color(0x0000_0000)
         .map_err(|e| Error::from_reason(e.reason.to_string()))?;
+    xcomponent_native
+        .set_focusable(true)
+        .map_err(|e| Error::from_reason(e.reason.to_string()))?;
+    xcomponent_native
+        .set_focus_on_touch(true)
+        .map_err(|e| Error::from_reason(e.reason.to_string()))?;
 
     let xcomponent = xcomponent_native.native_xcomponent();
 
@@ -465,14 +471,16 @@ pub fn render_for_window(
 
     let on_key_event_app = app.clone();
     let on_key_event_owner = render_owner.clone();
-    let _ = xcomponent.on_key_event(move |_, _, data| {
+    if let Err(error) = xcomponent.on_key_event(move |_, _, data| {
         dispatch_input(
             &on_key_event_app,
             &on_key_event_owner,
             InputEvent::XComponent(XComponentInputEvent::Key(data)),
         );
         Ok(())
-    });
+    }) {
+        crate::warn!("Failed to register XComponent key events: {error:?}");
+    }
 
     let on_mouse_event_app = app.clone();
     let on_mouse_event_owner = render_owner.clone();
