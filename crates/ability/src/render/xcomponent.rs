@@ -277,12 +277,17 @@ pub fn render_for_window(
     // The native binding's multi_mode registry is keyed by XComponentId.
     // ArkUI-created native nodes do not get a distinct id automatically, so
     // every surface must be named before obtaining its native handle.
+    crate::warn!("native XComponent before id: {:?}", xcomponent_native.native_xcomponent().id());
     xcomponent_native
         .set_x_component_id(format!(
             "ability-xc-{}",
             NEXT_XCOMPONENT_ID.fetch_add(1, Ordering::Relaxed)
         ))
-        .map_err(|e| Error::from_reason(e.reason.to_string()))?;
+        .map_err(|e| {
+            crate::warn!("native XComponent set id failed: {e:?}");
+            Error::from_reason(e.reason.to_string())
+        })?;
+    crate::warn!("native XComponent after id: {:?}", xcomponent_native.native_xcomponent().id());
     xcomponent_native
         .background_color(0x0000_0000)
         .map_err(|e| Error::from_reason(e.reason.to_string()))?;
