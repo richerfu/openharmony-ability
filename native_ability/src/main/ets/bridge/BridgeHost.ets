@@ -2,7 +2,12 @@ import common from "@ohos.app.ability.common";
 import { FrameNode } from "@ohos.arkui.node";
 import { UIContext } from "@ohos.arkui.UIContext";
 import window from "@ohos.window";
-import { WindowManager, WindowSizeEventWrap, WindowRectEventWrap } from "../window/WindowManager";
+import {
+  WindowManager,
+  WindowSizeEventWrap,
+  WindowRectEventWrap,
+  WindowAvoidAreaEventWrap,
+} from "../window/WindowManager";
 import {
   ApplicationLifecycle,
   BridgeCallContext,
@@ -636,7 +641,12 @@ class BridgeHost {
         return;
       }
       try {
-        this.applicationLifecycle?.windowStageEventCallback.onAvoidAreaChange(options);
+        const wrapped: WindowAvoidAreaEventWrap = {
+          windowId: 0,
+          type: options.type,
+          area: options.area,
+        };
+        this.applicationLifecycle?.windowStageEventCallback.onAvoidAreaChange(wrapped);
       } catch {}
     };
     const onKeyboardHeightChange = (height: number): void => {

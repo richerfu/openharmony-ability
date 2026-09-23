@@ -386,6 +386,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451"
 
 [[package]]
+name = "ohos-accessibility-binding"
+version = "0.1.0"
+source = "git+https://github.com/ohos-rs/ohos-native-bindings.git?rev=c05f75ebc489ad2a8c7f7b314aac38a27fb24836#c05f75ebc489ad2a8c7f7b314aac38a27fb24836"
+dependencies = [
+ "bitflags 2.13.2",
+ "ohos-accessibility-sys",
+ "ohos-arkui-input-sys",
+ "ohos-enum-derive 0.1.1 (git+https://github.com/ohos-rs/ohos-native-bindings.git?rev=c05f75ebc489ad2a8c7f7b314aac38a27fb24836)",
+]
+
+[[package]]
 name = "ohos-accessibility-sys"
 version = "0.0.4"
 source = "git+https://github.com/ohos-rs/ohos-native-bindings.git?rev=c05f75ebc489ad2a8c7f7b314aac38a27fb24836#c05f75ebc489ad2a8c7f7b314aac38a27fb24836"
@@ -722,6 +733,7 @@ dependencies = [
  "napi-derive-ohos",
  "napi-ohos",
  "napi-sys-ohos",
+ "ohos-accessibility-binding",
  "ohos-arkui-input-binding",
  "ohos-enum-derive 0.1.1 (git+https://github.com/ohos-rs/ohos-native-bindings.git?rev=c05f75ebc489ad2a8c7f7b314aac38a27fb24836)",
  "ohos-xcomponent-sys",

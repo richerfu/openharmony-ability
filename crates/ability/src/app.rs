@@ -1274,6 +1274,24 @@ impl OpenHarmonyApp {
         self.inner.read().unwrap().content_rect_for(window_id)
     }
 
+    /// Runs `callback` while the render XComponent for `window_id` is retained.
+    /// The component may be absent before its surface is mounted or after teardown.
+    pub fn with_xcomponent_for<R>(
+        &self,
+        window_id: i64,
+        callback: impl FnOnce(&XComponent) -> R,
+    ) -> Option<R> {
+        let inner = self.inner.read().ok()?;
+        if window_id == 0 {
+            inner.xcomponent.as_ref().map(callback)
+        } else {
+            inner
+                .sub_surfaces
+                .get(&window_id)
+                .map(|surface| callback(&surface.xcomponent))
+        }
+    }
+
     /// Get current app scale
     pub fn scale(&self) -> f32 {
         self.inner.read().unwrap().scale()

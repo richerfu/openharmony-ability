@@ -98,7 +98,13 @@ export class NativeAbility extends UIAbility {
       try {
         handler(runtime.lifecycle);
       } catch (e) {
-        hilog.error(DOMAIN, "NativeAbility", "Lifecycle callback error: %{public}s", String(e));
+        const error = e as Error;
+        hilog.error(
+          DOMAIN,
+          "NativeAbility",
+          "Lifecycle callback error: %{public}s",
+          `${String(e)}\n${error.stack ?? ""}`,
+        );
       }
     }
   }

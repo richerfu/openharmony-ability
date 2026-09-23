@@ -37,7 +37,7 @@ quote = { version = "1.0" }
 proc-macro2 = { version = "1.0" }
 
 ohos-arkui-binding = { version = "0.3" }
-ohos-xcomponent-binding = { version = "0.4", features = ["multi_mode"] }
+ohos-xcomponent-binding = { version = "0.4", features = ["multi_mode", "accessibility", "api-15"] }
 ohos-xcomponent-sys = { version = "0.1" }
 ohos-arkui-sys = { version = "0.1" }
 ohos-ime-binding = { version = "0.3" }

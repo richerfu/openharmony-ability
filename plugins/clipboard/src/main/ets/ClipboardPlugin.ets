@@ -357,7 +357,7 @@ export class ClipboardPlugin extends AsyncPluginBase {
     } catch (e) {
       const err = e as BusinessError;
       console.error(`[Clipboard] writeImageToClipboard failed: ${err.code} ${err.message}`);
-      throw e;
+      throw e as Error;
     } finally {
       pm?.release();
     }
