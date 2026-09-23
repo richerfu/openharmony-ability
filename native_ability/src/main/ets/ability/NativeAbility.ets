@@ -25,6 +25,7 @@ import {
   WindowSizeEventWrap,
   WindowRectEventWrap,
   WindowFocusEventWrap,
+  WindowAvoidAreaEventWrap,
 } from "../window/WindowManager";
 import { DOMAIN, MAIN_WINDOW_ID, NATIVE_MODULE_STORAGE_KEY } from "../helper/constants";
 import { ProcessInitializer } from "./ProcessInitializer";
@@ -542,6 +543,13 @@ export class NativeAbility extends UIAbility {
           lifecycle.windowStageEventCallback.onWindowFocusChange(wrapped),
         );
       });
+      WindowManager.getInstance().registerAvoidAreaChangeCallback(
+        (wrapped: WindowAvoidAreaEventWrap) => {
+          this.forEachLifecycle((lifecycle) =>
+            lifecycle.windowStageEventCallback.onAvoidAreaChange(wrapped),
+          );
+        },
+      );
 
       try {
         this.observedWindowStage = windowStage;
@@ -613,8 +621,13 @@ export class NativeAbility extends UIAbility {
             );
           });
           win.on("avoidAreaChange", (options: window.AvoidAreaOptions) => {
+            const wrapped: WindowAvoidAreaEventWrap = {
+              windowId: 0,
+              type: options.type,
+              area: options.area,
+            };
             this.forEachLifecycle((lifecycle) =>
-              lifecycle.windowStageEventCallback.onAvoidAreaChange(options),
+              lifecycle.windowStageEventCallback.onAvoidAreaChange(wrapped),
             );
           });
           win.on("keyboardHeightChange", (height) => {
@@ -772,6 +785,7 @@ export class NativeAbility extends UIAbility {
 
   private detachWindowListeners(): void {
     WindowManager.getInstance().unregisterFocusChangeCallback();
+    WindowManager.getInstance().unregisterAvoidAreaChangeCallback();
     const windowStage = this.observedWindowStage;
     this.observedWindowStage = undefined;
     if (windowStage !== undefined) {

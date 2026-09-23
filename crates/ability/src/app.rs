@@ -126,7 +126,7 @@ pub struct OpenHarmonyAppInner {
     /// window); every listener runs on every decor change under the lock.
     pub(crate) decor_change_callbacks: Vec<(u64, DecorChangeListener)>,
     next_decor_cb_id: u64,
-    pub(crate) avoid_areas: HashMap<AvoidAreaType, AvoidArea>,
+    pub(crate) avoid_areas: HashMap<(i64, AvoidAreaType), AvoidArea>,
     pub(crate) init_context: AbilityInitContext,
     // ─── Session state (migrated from module-level statics, issue #87 major-9) ───
     // These four carried session semantics while living at module scope, which is
@@ -371,7 +371,7 @@ impl OpenHarmonyAppInner {
         // NOTE: deactivate_surface intentionally does NOT reset window_rects — that
         // preserves the asymmetric semantics (only full release clears the rect cache).
         self.window_rects.remove(&0);
-        self.avoid_areas.clear();
+        self.avoid_areas.retain(|(window_id, _), _| *window_id != 0);
         Some(surface_was_active)
     }
 
@@ -396,11 +396,18 @@ impl OpenHarmonyAppInner {
     }
 
     pub fn avoid_area(&self, area_type: AvoidAreaType) -> Option<AvoidArea> {
-        self.avoid_areas.get(&area_type).copied()
+        self.avoid_area_for(0, area_type)
+    }
+
+    pub fn avoid_area_for(&self, window_id: i64, area_type: AvoidAreaType) -> Option<AvoidArea> {
+        self.avoid_areas.get(&(window_id, area_type)).copied()
     }
 
     pub fn avoid_areas(&self) -> HashMap<AvoidAreaType, AvoidArea> {
-        self.avoid_areas.clone()
+        self.avoid_areas
+            .iter()
+            .filter_map(|(&(window_id, kind), &area)| (window_id == 0).then_some((kind, area)))
+            .collect()
     }
 
     pub fn native_window(&self) -> Option<RawWindow> {
@@ -912,6 +919,9 @@ impl OpenHarmonyApp {
                     .native_xcomponent()
                     .unregister_callbacks();
                 inner.window_rects.remove(&id);
+                inner
+                    .avoid_areas
+                    .retain(|(window_id, _), _| *window_id != id);
                 Some((id, surface.active))
             }
         });
@@ -1240,6 +1250,13 @@ impl OpenHarmonyApp {
 
     pub fn avoid_area(&self, area_type: AvoidAreaType) -> Option<AvoidArea> {
         self.inner.read().unwrap().avoid_area(area_type)
+    }
+
+    pub fn avoid_area_for(&self, window_id: i64, area_type: AvoidAreaType) -> Option<AvoidArea> {
+        self.inner
+            .read()
+            .unwrap()
+            .avoid_area_for(window_id, area_type)
     }
 
     pub fn avoid_areas(&self) -> HashMap<AvoidAreaType, AvoidArea> {
@@ -1777,13 +1794,37 @@ mod tests {
         );
         inner
             .avoid_areas
-            .insert(AvoidAreaType::Keyboard, AvoidArea::default());
+            .insert((0, AvoidAreaType::Keyboard), AvoidArea::default());
 
         assert_eq!(inner.release_render_owner("owner"), Some(false));
         // release_render_owner clears key 0 (main window); sub-window rects would persist
         // until their own destruction path runs. Assert key 0 is gone.
         assert!(!inner.window_rects.contains_key(&0));
         assert!(inner.avoid_areas.is_empty());
+    }
+
+    #[test]
+    fn avoid_areas_are_isolated_by_window_id() {
+        let mut inner = OpenHarmonyAppInner::new();
+        let main = AvoidArea {
+            visible: true,
+            ..Default::default()
+        };
+        let child = AvoidArea::default();
+        inner.avoid_areas.insert((0, AvoidAreaType::Keyboard), main);
+        inner
+            .avoid_areas
+            .insert((7, AvoidAreaType::Keyboard), child);
+
+        assert_eq!(inner.avoid_area(AvoidAreaType::Keyboard), Some(main));
+        assert_eq!(
+            inner.avoid_area_for(7, AvoidAreaType::Keyboard),
+            Some(child)
+        );
+        assert_eq!(
+            inner.avoid_areas(),
+            [(AvoidAreaType::Keyboard, main)].into()
+        );
     }
 
     #[test]

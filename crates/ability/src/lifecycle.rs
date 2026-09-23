@@ -234,6 +234,7 @@ pub fn create_lifecycle_handle<'a>(
     let avoid_area_change_app = app.clone();
     let avoid_area_change = env.create_function_from_closure("avoid_area_change", move |ctx| {
         let options = ctx.first_arg::<Object>()?;
+        let window_id = options.get_named_property::<i64>("windowId")?;
         let area_type = AvoidAreaType::from(options.get_named_property::<i32>("type")?);
         let area = options.get_named_property::<Object>("area")?;
         let visible = area.get_named_property::<bool>("visible")?;
@@ -247,11 +248,12 @@ pub fn create_lifecycle_handle<'a>(
 
         {
             let mut inner = avoid_area_change_app.inner.write().unwrap();
-            inner.avoid_areas.insert(area_type, avoid_area);
+            inner.avoid_areas.insert((window_id, area_type), avoid_area);
         }
 
         if let Some(ref mut h) = *avoid_area_change_app.event_loop.borrow_mut() {
             h(Event::AvoidAreaChange(AvoidAreaInfo {
+                window_id,
                 area_type,
                 area: avoid_area,
             }))

@@ -27,6 +27,12 @@ export interface WindowFocusEventWrap {
   focused: boolean;
 }
 
+export interface WindowAvoidAreaEventWrap {
+  windowId: number;
+  type: number;
+  area: object;
+}
+
 interface WindowEntry {
   window: window.Window;
   storage?: LocalStorage;
@@ -34,6 +40,7 @@ interface WindowEntry {
   // destroyWindow/removeWindow can call win.off("windowRectChange", handler) to avoid
   // leaking the listener past window destruction.
   rectChangeHandler?: (options: window.RectChangeOptions) => void;
+  avoidAreaChangeHandler?: (options: window.AvoidAreaOptions) => void;
   // Phase 3 (design.md D4): set to true just before destroyWindow()/closeWindow Float
   // path calls win.destroyWindow(). throttledRectDispatch checks this to discard
   // in-flight events for a window being torn down (no consumers left).
@@ -128,6 +135,7 @@ export class WindowManager {
   // windowId parameter).
   private rectChangeCallback?: (options: WindowRectEventWrap) => void;
   private focusChangeCallback?: (options: WindowFocusEventWrap) => void;
+  private avoidAreaChangeCallback?: (options: WindowAvoidAreaEventWrap) => void;
 
   private constructor(context: common.UIAbilityContext) {
     this.context = context;
@@ -1508,6 +1516,29 @@ export class WindowManager {
       }
     }
 
+    const avoidAreaChangeHandler = (options: window.AvoidAreaOptions): void => {
+      this.avoidAreaChangeCallback?.({
+        windowId,
+        type: options.type,
+        area: options.area,
+      });
+    };
+    try {
+      win.on("avoidAreaChange", avoidAreaChangeHandler);
+      const entry = this.windows.get(windowId);
+      if (entry) {
+        entry.avoidAreaChangeHandler = avoidAreaChangeHandler;
+      }
+    } catch (error) {
+      hilog.warn(
+        DOMAIN,
+        "WindowManager",
+        "Failed to register avoidAreaChange for sub-window %{public}d: %{public}s",
+        windowId,
+        String(error),
+      );
+    }
+
     // Register focus tracking for sub-window
     this.registerFocusTracking(win, windowId);
 
@@ -1882,6 +1913,14 @@ export class WindowManager {
     this.focusChangeCallback = undefined;
   }
 
+  registerAvoidAreaChangeCallback(cb: (options: WindowAvoidAreaEventWrap) => void): void {
+    this.avoidAreaChangeCallback = cb;
+  }
+
+  unregisterAvoidAreaChangeCallback(): void {
+    this.avoidAreaChangeCallback = undefined;
+  }
+
   unregisterRectChangeCallback(): void {
     this.rectChangeCallback = undefined;
   }
@@ -1992,6 +2031,19 @@ export class WindowManager {
           `off windowRectChange failed for %{public}d: %{public}s`,
           windowId,
           String(e),
+        );
+      }
+    }
+    if (entry?.avoidAreaChangeHandler) {
+      try {
+        entry.window.off("avoidAreaChange", entry.avoidAreaChangeHandler);
+      } catch (error) {
+        hilog.warn(
+          DOMAIN,
+          "WindowManager",
+          "off avoidAreaChange failed for %{public}d: %{public}s",
+          windowId,
+          String(error),
         );
       }
     }
