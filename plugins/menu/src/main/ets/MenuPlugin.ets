@@ -161,6 +161,7 @@ interface PredefinedRequest {
 export class MenuPlugin extends AsyncPluginBase {
   readonly id = "ohos.menu";
   readonly requires: BridgeContextRequirement[] = ["ui-context"];
+  private menuManager: MenuManager | null = null;
 
   onInstall(_context: BridgePluginHookContext): void {
     setMenuBarSlotBuilder(wrapBuilder(menuBarBuilder));
@@ -256,6 +257,7 @@ export class MenuPlugin extends AsyncPluginBase {
     });
 
     const menuManager = new MenuManager(executor, emitMenuEventFn);
+    this.menuManager = menuManager;
 
     setMenuClickHandler(0, (item) => {
       hilog.info(
@@ -265,7 +267,7 @@ export class MenuPlugin extends AsyncPluginBase {
         item.id,
         item.type,
       );
-      menuManager.handleItemClick(item);
+      menuManager.handleItemClick(item, "main");
     });
 
     setMenuBarRecoverFn(0, () => {
@@ -321,6 +323,14 @@ export class MenuPlugin extends AsyncPluginBase {
         );
       }
       cb.onMenubarJson?.(request.jsonData);
+      if (request.windowId !== "main") {
+        const windowId = Number(request.windowId);
+        if (Number.isSafeInteger(windowId) && windowId > 0) {
+          setMenuClickHandler(windowId, (item) => {
+            this.menuManager?.handleItemClick(item, request.windowId);
+          });
+        }
+      }
       return { typeName: ACKNOWLEDGEMENT_TYPE, value: new BridgeAcknowledgement(true) };
     }
 

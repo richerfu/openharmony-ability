@@ -1502,6 +1502,7 @@ pub fn notify_window_status(window_id: i32, status: i32) {
             poisoned.into_inner().push((window_id, status));
         }
     }
+    OpenHarmonyWaker::new().wake();
 }
 
 /// Drain all pending window status changes.

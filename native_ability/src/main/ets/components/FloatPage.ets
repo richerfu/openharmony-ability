@@ -98,6 +98,19 @@ struct FloatPage {
     this.windowClass?.moveWindowTo(this.windowPosition.x, this.windowPosition.y);
   }
 
+  private startMoveFromTitle(event: TouchEvent): void {
+    if (event.type !== TouchType.Down || this.isMaximized || deviceInfo.sdkApiVersion < 14) {
+      return;
+    }
+    try {
+      this.windowClass?.startMoving()?.catch((err: BusinessError) => {
+        hilog.warn(DOMAIN, "FloatPage", "startMoving failed: %{public}s", JSON.stringify(err));
+      });
+    } catch (err) {
+      hilog.warn(DOMAIN, "FloatPage", "startMoving exception: %{public}s", String(err));
+    }
+  }
+
   aboutToAppear(): void {
     hilog.info(DOMAIN, "FloatPage", "=== FloatPage aboutToAppear START ===");
     hilog.info(DOMAIN, "FloatPage", "Received windowId: %{public}d", this.windowId);
@@ -228,14 +241,17 @@ struct FloatPage {
           if (this.windowClass && (this.decorations || this.isDesktop)) {
             Row() {
               // Title text (left, occupies remaining space)
-              Text(this.title)
-                .fontSize(13)
-                .fontColor("#333333")
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .margin({ left: 12 })
-                .height(40)
-                .layoutWeight(1)
+              Row() {
+                Text(this.title)
+                  .fontSize(13)
+                  .fontColor("#333333")
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .margin({ left: 12 })
+              }
+              .height(40)
+              .layoutWeight(1)
+              .onTouch((event: TouchEvent) => this.startMoveFromTitle(event))
 
               // Minimize button — always visible when decorations=true;
               // interception is in WindowManager.minimizeWindow (getDecorationFlag check)
@@ -392,46 +408,7 @@ struct FloatPage {
             }
             .width("100%")
             .height(40)
-            .align(Alignment.TopEnd)
-            // startMoving (API14+) must be called in onTouch(TouchType.Down) on the Row
-            // (not Text — Text may not capture touch events reliably).
-            // Guarded like setWindowTopmost/restoreWindow: on API<14 startMoving is undefined,
-            // so skip (drag unavailable on old API) instead of throwing on every touch-down.
-            // A PanGesture fallback is NOT attached alongside startMoving — a simultaneously
-            // bound PanGesture consumes the Down event and blocks startMoving, so the two
-            // cannot coexist; mutually-exclusive Row branching was deemed not worth the
-            // duplication given Float dragging targets API14+ desktop.
-            .onTouch((event: TouchEvent) => {
-              if (event.type === TouchType.Down) {
-                // While maximized, startMoving() at touch-DOWN triggers WMS
-                // drag-off-maximize immediately (GetFullScreenToFloatingRect,
-                // pointer-anchored): the window jumps away before touch-UP, the
-                // UP lands out of region, and the ❐/—/✕ button click gesture is
-                // rejected — onClick never fires (device-verified 2026-08-27:
-                // "MOVE/UP event is out of region, try to reject click gesture").
-                // Drag while maximized is sacrificed; restore via the ❐ button
-                // (recoverWindow restores the pre-maximize rect).
-                if (this.isMaximized) {
-                  return;
-                }
-                if (deviceInfo.sdkApiVersion < 14) {
-                  return;
-                }
-                try {
-                  this.windowClass?.startMoving()?.catch((err: BusinessError) => {
-                    hilog.warn(
-                      DOMAIN,
-                      "FloatPage",
-                      "startMoving failed: %{public}s",
-                      JSON.stringify(err),
-                    );
-                  });
-                } catch (err) {
-                  hilog.warn(DOMAIN, "FloatPage", "startMoving exception: %{public}s", String(err));
-                }
-              }
-            });
-            // PanGesture removed — startMoving handles drag natively (no conflict).
+            .align(Alignment.TopEnd);
           }
         }
         .layoutWeight(1)

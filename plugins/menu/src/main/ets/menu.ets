@@ -449,7 +449,7 @@ export class MenuManager {
     }
   }
 
-  handleItemClick(item: MenuItemData): void {
+  handleItemClick(item: MenuItemData, windowId: string = this.currentWindowId): void {
     hilog.info(
       DOMAIN,
       "Menu",
@@ -459,9 +459,13 @@ export class MenuManager {
       item.predefinedType ?? "none",
     );
     if (item.type === "predefined" && item.predefinedType) {
-      this.executor.execute(item.predefinedType, item.aboutMetadata, this.currentWindowIdNumeric);
+      this.executor.execute(
+        item.predefinedType,
+        item.aboutMetadata,
+        windowId === "main" ? MAIN_WINDOW_ID : Number(windowId),
+      );
     } else {
-      this.emitMenuEventFn(item.id, this.currentWindowId);
+      this.emitMenuEventFn(item.id, windowId);
     }
   }
 }
