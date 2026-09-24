@@ -200,9 +200,9 @@ export struct MenuBarComponent {
     for (const id of this.menubarIconIds) {
       liveIds.add(id);
     }
-    for (const [id, pm] of this.iconPixelMaps) {
+    for (const id of this.iconPixelMaps.keys()) {
       if (!liveIds.has(id)) {
-        pm.release();
+        this.iconPixelMaps.get(id)?.release();
         this.iconPixelMaps.delete(id);
       }
     }
@@ -511,7 +511,7 @@ export struct MenuBarComponent {
     menubarVisibilityTracker.delete(this.windowId);
 
     // Release all icon PixelMaps
-    for (const [, pm] of this.iconPixelMaps) {
+    for (const pm of this.iconPixelMaps.values()) {
       pm.release();
     }
     this.iconPixelMaps.clear();

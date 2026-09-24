@@ -17,6 +17,11 @@ import { getMenuDataCallback } from "./MenuBarComponent";
 // Global executor singleton — shared by Menu and Tray execution paths
 let globalExecutor: PredefinedActionExecutor | null = null;
 
+interface TargetWindow {
+  win: window.Window | null;
+  windowId: number;
+}
+
 export function setPredefinedActionExecutor(executor: PredefinedActionExecutor): void {
   globalExecutor = executor;
 }
@@ -126,10 +131,7 @@ export class PredefinedActionExecutor {
    * 2. WindowManager.getUserInteractedWindow() — last physically touched window (Tray path)
    * 3. Main window (this.win) — final fallback
    */
-  private getTargetWindow(targetWindowId?: number): {
-    win: window.Window | null;
-    windowId: number;
-  } {
+  private getTargetWindow(targetWindowId?: number): TargetWindow {
     const wm = WindowManager.getInstance();
 
     // Strategy 1: Use targetWindowId if provided (Window Menu Bar path)
@@ -179,7 +181,9 @@ export class PredefinedActionExecutor {
    * - Tray Menu: minimize the last focused window (targetWindowId undefined)
    */
   private async minimizeWindow(targetWindowId?: number): Promise<void> {
-    const { win, windowId } = this.getTargetWindow(targetWindowId);
+    const target = this.getTargetWindow(targetWindowId);
+    const win = target.win;
+    const windowId = target.windowId;
     if (!win) {
       return;
     }
@@ -200,7 +204,9 @@ export class PredefinedActionExecutor {
    * - Tray Menu: close the last focused window (targetWindowId undefined)
    */
   private async closeWindow(targetWindowId?: number): Promise<void> {
-    const { win, windowId } = this.getTargetWindow(targetWindowId);
+    const target = this.getTargetWindow(targetWindowId);
+    const win = target.win;
+    const windowId = target.windowId;
     if (!win) {
       return;
     }
@@ -232,7 +238,9 @@ export class PredefinedActionExecutor {
     try {
       // Resolve target window for window operations
       // getTargetWindow() handles both Menu Bar (targetWindowId provided) and Tray (undefined → lastUserInteractedWindow)
-      const { win, windowId: resolvedWindowId } = this.getTargetWindow(targetWindowId);
+      const target = this.getTargetWindow(targetWindowId);
+      const win = target.win;
+      const resolvedWindowId = target.windowId;
 
       hilog.info(
         DOMAIN,

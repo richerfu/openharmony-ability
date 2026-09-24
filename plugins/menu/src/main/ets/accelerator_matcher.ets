@@ -133,7 +133,14 @@ export class AcceleratorMatcher {
       return result;
     }
     if (result && typeof result === "object") {
-      return !!result[modifier];
+      switch (modifier) {
+        case "Ctrl":
+          return !!result.Ctrl;
+        case "Shift":
+          return !!result.Shift;
+        case "Alt":
+          return !!result.Alt;
+      }
     }
     return false;
   }
