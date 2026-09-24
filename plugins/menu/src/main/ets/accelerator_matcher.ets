@@ -128,21 +128,7 @@ export class AcceleratorMatcher {
     if (!event.getModifierKeyState) {
       return false;
     }
-    const result = event.getModifierKeyState([modifier]);
-    if (typeof result === "boolean") {
-      return result;
-    }
-    if (result && typeof result === "object") {
-      switch (modifier) {
-        case "Ctrl":
-          return !!result.Ctrl;
-        case "Shift":
-          return !!result.Shift;
-        case "Alt":
-          return !!result.Alt;
-      }
-    }
-    return false;
+    return event.getModifierKeyState([modifier]);
   }
 
   getMatchedItem(): MenuItemData | null {
