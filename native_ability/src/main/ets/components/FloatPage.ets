@@ -221,12 +221,12 @@ struct FloatPage {
   build() {
     Stack() {
       Column() {
-        // The slot itself renders nothing until the menu plugin and menu items are available.
+        // Menubar (only on desktop when menu items are available and decorations are enabled).
         // MenuBarSlotHost reads the slot live — by FloatPage construction the
         // slot is normally registered already, but the host keeps the late-
         // registration case (first window, plugin installs at ui-context)
         // working identically to MainPage.
-        if (this.decorations) {
+        if (this.isDesktop && this.decorations) {
           MenuBarSlotHost({ windowId: this.windowId });
         }
         Stack({ alignContent: Alignment.TopEnd }) {
