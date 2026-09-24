@@ -845,15 +845,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "openharmony-ability-plugin-credentials"
-version = "1.0.0-beta.0"
-dependencies = [
- "napi-derive-ohos",
- "napi-ohos",
- "openharmony-ability",
-]
-
-[[package]]
 name = "openharmony-ability-plugin-deep-link"
 version = "1.0.0-beta.0"
 dependencies = [
