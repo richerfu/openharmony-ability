@@ -85,8 +85,11 @@ pub fn ability(attr: TokenStream, item: TokenStream) -> TokenStream {
                     .unwrap_or(false);
                 if owns_render {
                     let root = node.borrow_mut().take();
-                    drop(root);
+                    // Release gestures, accessibility and surface consumers while the
+                    // RootNode still owns the live ArkUI node. Dropping it first makes
+                    // removeGestureFromNode dereference an already disposed node.
                     (*APP).release_render(&render_owner);
+                    drop(root);
                 }
             });
             SUB_ROOT_NODES.with(|nodes| {
@@ -94,8 +97,8 @@ pub fn ability(attr: TokenStream, item: TokenStream) -> TokenStream {
                     (owner == &render_owner).then_some(*id));
                 if let Some(id) = id {
                     let root = nodes.borrow_mut().remove(&id);
-                    drop(root);
                     (*APP).release_render(&render_owner);
+                    drop(root);
                 }
             });
         }
@@ -105,14 +108,15 @@ pub fn ability(attr: TokenStream, item: TokenStream) -> TokenStream {
             ROOT_NODE.with(|node| {
                 let root = node.borrow_mut().take();
                 if let Some((owner, root)) = root {
-                    drop(root);
                     (*APP).release_render(&owner);
+                    drop(root);
                 }
             });
             SUB_ROOT_NODES.with(|nodes| {
-                for (_, (owner, root)) in nodes.borrow_mut().drain() {
-                    drop(root);
+                let roots: Vec<_> = nodes.borrow_mut().drain().collect();
+                for (_, (owner, root)) in roots {
                     (*APP).release_render(&owner);
+                    drop(root);
                 }
             });
         }
