@@ -90,6 +90,8 @@ pub struct OpenHarmonyAppInner {
     /// Owner token of this native module's one active DefaultXComponent render.
     render_owner: Option<String>,
     touch_input_delivery: TouchInputDelivery,
+    frame_input_delivery: HashMap<i64, crate::FrameInputDelivery>,
+    render_thread: Option<std::thread::ThreadId>,
     surface_active: bool,
     sub_surfaces: HashMap<i64, SubRenderSurface>,
 
@@ -201,6 +203,8 @@ impl OpenHarmonyAppInner {
             render_gestures: RenderGestures::default(),
             render_owner: None,
             touch_input_delivery: TouchInputDelivery::default(),
+            frame_input_delivery: HashMap::new(),
+            render_thread: None,
             surface_active: false,
             sub_surfaces: HashMap::new(),
             state: vec![],
@@ -277,6 +281,17 @@ impl OpenHarmonyAppInner {
         self.render_owner = Some(owner.to_owned());
         self.surface_active = false;
         Ok(())
+    }
+
+    #[cfg(target_env = "ohos")]
+    pub(crate) fn frame_owner_is_active(&self, owner: &str) -> bool {
+        if self.owns_render(owner) {
+            self.surface_active
+        } else {
+            self.sub_surfaces
+                .values()
+                .any(|surface| surface.owner == owner && surface.active)
+        }
     }
 
     fn owns_render(&self, owner: &str) -> bool {
@@ -704,6 +719,73 @@ impl OpenHarmonyApp {
             .unwrap_or_default()
     }
 
+    /// Chooses continuous display callbacks or external, on-demand frame scheduling.
+    /// Active render changes must be made on the N-API/UI thread. No input callbacks are removed.
+    pub fn set_frame_input_delivery_for(
+        &self,
+        window_id: i64,
+        delivery: crate::FrameInputDelivery,
+    ) -> Result<()> {
+        let target = {
+            let inner = self
+                .inner
+                .read()
+                .map_err(|_| Error::from_reason("Cannot read frame delivery"))?;
+            if inner
+                .frame_input_delivery
+                .get(&window_id)
+                .copied()
+                .unwrap_or_default()
+                == delivery
+            {
+                return Ok(());
+            }
+            if window_id == 0 {
+                inner
+                    .xcomponent
+                    .as_ref()
+                    .zip(inner.render_owner.as_ref())
+                    .filter(|_| inner.surface_active)
+                    .map(|(node, owner)| (node.native_xcomponent(), owner.clone()))
+            } else {
+                inner
+                    .sub_surfaces
+                    .get(&window_id)
+                    .filter(|surface| surface.active)
+                    .map(|surface| {
+                        (
+                            surface.xcomponent.native_xcomponent(),
+                            surface.owner.clone(),
+                        )
+                    })
+            }
+        };
+        if let Some((native, owner)) = target {
+            if self.inner.read().ok().and_then(|inner| inner.render_thread)
+                != Some(std::thread::current().id())
+            {
+                return Err(Error::from_reason(
+                    "Active frame delivery must change on the UI thread",
+                ));
+            }
+            self.configure_frame_callback(&native, window_id, &owner, delivery)?;
+        }
+        self.inner
+            .write()
+            .map_err(|_| Error::from_reason("Cannot store frame delivery"))?
+            .frame_input_delivery
+            .insert(window_id, delivery);
+        Ok(())
+    }
+
+    pub fn frame_input_delivery_for(&self, window_id: i64) -> crate::FrameInputDelivery {
+        self.inner
+            .read()
+            .ok()
+            .and_then(|inner| inner.frame_input_delivery.get(&window_id).copied())
+            .unwrap_or_default()
+    }
+
     /// Selects the touch representation delivered by future XComponent renders.
     ///
     /// Delivery is frozen for an active render so one physical pointer sequence cannot switch
@@ -749,6 +831,14 @@ impl OpenHarmonyApp {
             .inner
             .write()
             .map_err(|_| Error::from_reason("Failed to claim native render owner"))?;
+        let render_thread = std::thread::current().id();
+        if inner
+            .render_thread
+            .is_some_and(|thread| thread != render_thread)
+        {
+            return Err(Error::from_reason("Render owners must share the UI thread"));
+        }
+        inner.render_thread = Some(render_thread);
         if window_id == 0 {
             inner.claim_render_owner(owner)?;
             inner.xcomponent = Some(xcomponent);
@@ -919,6 +1009,7 @@ impl OpenHarmonyApp {
                     .native_xcomponent()
                     .unregister_callbacks();
                 inner.window_rects.remove(&id);
+                inner.frame_input_delivery.remove(&id);
                 inner
                     .avoid_areas
                     .retain(|(window_id, _), _| *window_id != id);
@@ -1584,6 +1675,33 @@ pub fn read_continue_snapshot() -> String {
 #[cfg(test)]
 mod continuation_tests {
     use super::*;
+
+    #[test]
+    fn frame_delivery_is_per_window_and_defaults_to_continuous() {
+        let app = OpenHarmonyApp::default();
+        assert_eq!(
+            app.frame_input_delivery_for(0),
+            crate::FrameInputDelivery::Continuous
+        );
+        app.set_frame_input_delivery_for(0, crate::FrameInputDelivery::OnDemand)
+            .unwrap();
+        assert_eq!(
+            app.frame_input_delivery_for(0),
+            crate::FrameInputDelivery::OnDemand
+        );
+        assert_eq!(
+            app.frame_input_delivery_for(1),
+            crate::FrameInputDelivery::Continuous
+        );
+        app.set_frame_input_delivery_for(1, crate::FrameInputDelivery::OnDemand)
+            .unwrap();
+        app.set_frame_input_delivery_for(0, crate::FrameInputDelivery::Continuous)
+            .unwrap();
+        assert_eq!(
+            app.frame_input_delivery_for(1),
+            crate::FrameInputDelivery::OnDemand
+        );
+    }
 
     #[test]
     fn test_take_continuation_data_drains() {

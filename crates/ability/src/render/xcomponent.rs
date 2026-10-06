@@ -13,8 +13,8 @@ use ohos_xcomponent_binding::{XComponentOffset, XComponentSize};
 
 use crate::{
     input, set_main_thread_env, ArkUiInputEvent, AxisEventData, Event, GestureEvent, GesturePhase,
-    InputEvent, IntervalInfo, OpenHarmonyApp, PanGestureEvent, PointerInputData, Rect, Size,
-    SwipeGestureEvent, TapGestureEvent, XComponentInputEvent,
+    InputEvent, OpenHarmonyApp, PanGestureEvent, PointerInputData, Rect, Size, SwipeGestureEvent,
+    TapGestureEvent, XComponentInputEvent,
 };
 
 const PAN_GESTURE_DISTANCE: f64 = 8.0;
@@ -286,7 +286,6 @@ pub fn render_for_window(
 
     let on_surface_created_app = app.clone();
     let on_surface_created_owner = render_owner.clone();
-    let redraw_app = app.clone();
 
     let (
         insert_text_callback_tsfn,
@@ -376,6 +375,13 @@ pub fn render_for_window(
                 .insert(window_id, ime);
         }
 
+        on_surface_created_app.configure_frame_callback(
+            &xc,
+            window_id,
+            &on_surface_created_owner,
+            on_surface_created_app.frame_input_delivery_for(window_id),
+        )?;
+
         {
             if let Some(ref mut h) = *on_surface_created_app.event_loop.borrow_mut() {
                 if window_id == 0 {
@@ -386,28 +392,6 @@ pub fn render_for_window(
             }
         }
 
-        let inner_redraw_app = redraw_app.clone();
-        let inner_redraw_owner = on_surface_created_owner.clone();
-        xc.on_frame_callback(move |_xcomponent, _time, _time_stamp| {
-            if !inner_redraw_app.is_render_surface_active(&inner_redraw_owner) {
-                return Ok(());
-            }
-            if let Some(ref mut h) = *inner_redraw_app.event_loop.borrow_mut() {
-                let interval = IntervalInfo {
-                    time_stamp: _time_stamp as _,
-                    target_time_stamp: _time as _,
-                };
-                if window_id == 0 {
-                    h(Event::WindowRedraw(interval))
-                } else {
-                    h(Event::SubWindowRedraw {
-                        window_id,
-                        interval,
-                    })
-                }
-            }
-            Ok(())
-        })?;
         Ok(())
     });
 
@@ -570,5 +554,81 @@ mod tests {
 
         assert_eq!(tracker.next(GesturePhase::Cancel, 6.0, 9.0), (0.0, 0.0));
         assert_eq!(tracker.next(GesturePhase::Start, 2.0, 3.0), (2.0, 3.0));
+    }
+}
+
+/// Continuous callbacks remain the default for existing consumers.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum FrameInputDelivery {
+    #[default]
+    Continuous,
+    OnDemand,
+}
+
+impl OpenHarmonyApp {
+    #[cfg(target_env = "ohos")]
+    pub(crate) fn configure_frame_callback(
+        &self,
+        native: &ohos_xcomponent_binding::NativeXComponent,
+        window_id: i64,
+        owner: &str,
+        delivery: FrameInputDelivery,
+    ) -> Result<()> {
+        if delivery == FrameInputDelivery::OnDemand {
+            // The native node is retained and active on the UI thread for this operation.
+            let code = unsafe {
+                ohos_xcomponent_sys::OH_NativeXComponent_UnregisterOnFrameCallback(native.raw())
+            };
+            return if code == 0 {
+                Ok(())
+            } else {
+                Err(Error::from_reason(format!(
+                    "Cannot disable native frame callback: {code}"
+                )))
+            };
+        }
+        let inner = Arc::downgrade(&self.inner);
+        let event_loop = Arc::downgrade(&self.event_loop);
+        let owner = owner.to_owned();
+        native.on_frame_callback(move |_, time, time_stamp| {
+            let Some(inner) = inner.upgrade() else {
+                return Ok(());
+            };
+            if !inner
+                .read()
+                .map(|inner| inner.frame_owner_is_active(&owner))
+                .unwrap_or(false)
+            {
+                return Ok(());
+            }
+            let Some(event_loop) = event_loop.upgrade() else {
+                return Ok(());
+            };
+            if let Some(handler) = event_loop.borrow_mut().as_mut() {
+                let interval = crate::IntervalInfo {
+                    time_stamp: time_stamp as _,
+                    target_time_stamp: time as _,
+                };
+                if window_id == 0 {
+                    handler(Event::WindowRedraw(interval));
+                } else {
+                    handler(Event::SubWindowRedraw {
+                        window_id,
+                        interval,
+                    });
+                }
+            }
+            Ok(())
+        })
+    }
+    #[cfg(not(target_env = "ohos"))]
+    pub(crate) fn configure_frame_callback(
+        &self,
+        _native: &ohos_xcomponent_binding::NativeXComponent,
+        _window_id: i64,
+        _owner: &str,
+        _delivery: FrameInputDelivery,
+    ) -> Result<()> {
+        Err(Error::from_reason("Native frame callbacks require OHOS"))
     }
 }
