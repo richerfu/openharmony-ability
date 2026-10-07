@@ -566,7 +566,6 @@ pub enum FrameInputDelivery {
 }
 
 impl OpenHarmonyApp {
-    #[cfg(target_env = "ohos")]
     pub(crate) fn configure_frame_callback(
         &self,
         native: &ohos_xcomponent_binding::NativeXComponent,
@@ -620,15 +619,5 @@ impl OpenHarmonyApp {
             }
             Ok(())
         })
-    }
-    #[cfg(not(target_env = "ohos"))]
-    pub(crate) fn configure_frame_callback(
-        &self,
-        _native: &ohos_xcomponent_binding::NativeXComponent,
-        _window_id: i64,
-        _owner: &str,
-        _delivery: FrameInputDelivery,
-    ) -> Result<()> {
-        Err(Error::from_reason("Native frame callbacks require OHOS"))
     }
 }

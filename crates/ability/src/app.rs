@@ -283,7 +283,6 @@ impl OpenHarmonyAppInner {
         Ok(())
     }
 
-    #[cfg(target_env = "ohos")]
     pub(crate) fn frame_owner_is_active(&self, owner: &str) -> bool {
         if self.owns_render(owner) {
             self.surface_active
@@ -605,6 +604,8 @@ impl OpenHarmonyApp {
             back_press_interceptor: Arc::new(RefCell::new(None)),
             #[allow(clippy::arc_with_non_send_sync)]
             ime: Arc::new(RefCell::new(None)),
+            // IME access stays on the UI thread; app clones share its ownership.
+            #[allow(clippy::arc_with_non_send_sync)]
             sub_ime: Arc::new(RefCell::new(HashMap::new())),
             bridge_session: Arc::new(RwLock::new(None)),
             bridge_plugins: Arc::new(BridgePluginRegistry::default()),

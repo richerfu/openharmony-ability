@@ -323,7 +323,7 @@ impl MenuExt for OpenHarmonyApp {
     }
 }
 
-#[cfg(all(test, target_env = "ohos"))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
