@@ -1,5 +1,7 @@
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
+use super::pan::PanTracker;
+
 use napi_ohos::threadsafe_function::ThreadsafeFunctionCallMode::NonBlocking;
 use napi_ohos::{Env, Error, Result};
 use ohos_arkui_binding::component::attribute::{ArkUICommonAttribute, ArkUIGesture};
@@ -19,11 +21,6 @@ use crate::{
 
 const PAN_GESTURE_DISTANCE: f64 = 8.0;
 const SWIPE_GESTURE_MIN_SPEED: f64 = 100.0;
-
-#[derive(Default)]
-struct PanDeltaTracker {
-    previous_offset: Option<(f32, f32)>,
-}
 
 struct RenderOwnerGuard {
     app: OpenHarmonyApp,
@@ -50,24 +47,6 @@ impl Drop for RenderOwnerGuard {
         if self.armed {
             self.app.release_render(&self.owner);
         }
-    }
-}
-
-impl PanDeltaTracker {
-    fn next(&mut self, phase: GesturePhase, offset_x: f32, offset_y: f32) -> (f32, f32) {
-        if phase == GesturePhase::Cancel {
-            self.previous_offset = None;
-            return (0.0, 0.0);
-        }
-
-        let (previous_x, previous_y) = self.previous_offset.unwrap_or_default();
-        let delta = (offset_x - previous_x, offset_y - previous_y);
-        self.previous_offset = if phase == GesturePhase::End {
-            None
-        } else {
-            Some((offset_x, offset_y))
-        };
-        delta
     }
 }
 
@@ -109,6 +88,7 @@ fn register_gestures(
     xcomponent: &XComponent,
     render_owner: &str,
     app: &OpenHarmonyApp,
+    pan_tracker: Rc<RefCell<PanTracker>>,
 ) -> Result<Vec<Gesture>> {
     let mut gestures = Vec::with_capacity(3);
 
@@ -145,42 +125,45 @@ fn register_gestures(
 
     let pan_app = app.clone();
     let pan_owner = render_owner.to_owned();
-    let pan_tracker = Rc::new(RefCell::new(PanDeltaTracker::default()));
     let pan = match xcomponent.on_pan_gesture(
         1,
         GestureDirection::All,
         PAN_GESTURE_DISTANCE,
         move |event| {
+            if !pan_app.is_render_surface_active(&pan_owner) {
+                pan_tracker.borrow_mut().reset();
+                return;
+            }
             let Some(phase) = gesture_phase(&event.event_action_type) else {
                 return;
             };
-            let Some(pointer) = event.input.map(PointerInputData::from) else {
-                return;
+            let pointer = event.input.map(PointerInputData::from);
+            let pan_event = if phase == GesturePhase::Cancel {
+                pan_tracker.borrow_mut().cancel(pointer)
+            } else {
+                let Some(pointer) = pointer else { return };
+                let GestureData::Pan(data) = event.event_action_data else {
+                    return;
+                };
+                pan_tracker.borrow_mut().update(PanGestureEvent {
+                    pointer,
+                    phase,
+                    delta_x: 0.0,
+                    delta_y: 0.0,
+                    offset_x: data.offset_x,
+                    offset_y: data.offset_y,
+                    velocity: data.velocity,
+                    velocity_x: data.velocity_x,
+                    velocity_y: data.velocity_y,
+                })
             };
-            let GestureData::Pan(data) = event.event_action_data else {
-                return;
-            };
-            let (delta_x, delta_y) =
-                pan_tracker
-                    .borrow_mut()
-                    .next(phase, data.offset_x, data.offset_y);
-            dispatch_input(
-                &pan_app,
-                &pan_owner,
-                InputEvent::ArkUi(ArkUiInputEvent::Gesture(GestureEvent::Pan(
-                    PanGestureEvent {
-                        pointer,
-                        phase,
-                        delta_x,
-                        delta_y,
-                        offset_x: data.offset_x,
-                        offset_y: data.offset_y,
-                        velocity: data.velocity,
-                        velocity_x: data.velocity_x,
-                        velocity_y: data.velocity_y,
-                    },
-                ))),
-            );
+            if let Some(event) = pan_event {
+                dispatch_input(
+                    &pan_app,
+                    &pan_owner,
+                    InputEvent::ArkUi(ArkUiInputEvent::Gesture(GestureEvent::Pan(event))),
+                );
+            }
         },
     ) {
         Ok(pan) => pan,
@@ -283,6 +266,8 @@ pub fn render_for_window(
     let mut render_guard = RenderOwnerGuard::new(app.clone(), render_owner.clone());
 
     let xc = xcomponent.clone();
+    let pan_tracker = Rc::new(RefCell::new(PanTracker::default()));
+    let created_pan_tracker = pan_tracker.clone();
 
     let on_surface_created_app = app.clone();
     let on_surface_created_owner = render_owner.clone();
@@ -331,6 +316,8 @@ pub fn render_for_window(
             return Ok(());
         }
 
+        created_pan_tracker.borrow_mut().reset();
+
         // We need to create IME instance when app is focused.
         let ime = IME::new(Default::default());
 
@@ -375,13 +362,6 @@ pub fn render_for_window(
                 .insert(window_id, ime);
         }
 
-        on_surface_created_app.configure_frame_callback(
-            &xc,
-            window_id,
-            &on_surface_created_owner,
-            on_surface_created_app.frame_input_delivery_for(window_id),
-        )?;
-
         {
             if let Some(ref mut h) = *on_surface_created_app.event_loop.borrow_mut() {
                 if window_id == 0 {
@@ -392,12 +372,24 @@ pub fn render_for_window(
             }
         }
 
+        // Surface lifetime is valid independently of frame callback registration.
+        // The handler may already have selected on-demand scheduling. Reconcile
+        // afterwards; failure remains retryable and must never swallow SurfaceCreate.
+        if let Err(error) = on_surface_created_app.set_frame_input_delivery_for(
+            window_id,
+            on_surface_created_app.frame_input_delivery_for(window_id),
+        ) {
+            crate::warn!("Cannot configure native surface frames: {error}");
+        }
+
         Ok(())
     });
 
     let on_surface_destroyed_app = app.clone();
     let on_surface_destroyed_owner = render_owner.clone();
+    let destroyed_pan_tracker = pan_tracker.clone();
     xcomponent.on_surface_destroyed(move |_, _| {
+        destroyed_pan_tracker.borrow_mut().reset();
         if on_surface_destroyed_app.deactivate_render_surface(&on_surface_destroyed_owner) {
             if window_id == 0 {
                 on_surface_destroyed_app.dispatch_surface_destroy();
@@ -520,7 +512,7 @@ pub fn render_for_window(
     })?;
 
     if touch_input_delivery.delivers_arkui_gestures() {
-        let gestures = register_gestures(&xcomponent_native, &render_owner, &app)?;
+        let gestures = register_gestures(&xcomponent_native, &render_owner, &app, pan_tracker)?;
         app.set_render_gestures(&render_owner, gestures)?;
     }
 
@@ -531,30 +523,6 @@ pub fn render_for_window(
     render_guard.disarm();
 
     Ok(root)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn pan_delta_tracker_converts_cumulative_offsets() {
-        let mut tracker = PanDeltaTracker::default();
-
-        assert_eq!(tracker.next(GesturePhase::Start, 3.0, 5.0), (3.0, 5.0));
-        assert_eq!(tracker.next(GesturePhase::Update, 7.0, 4.0), (4.0, -1.0));
-        assert_eq!(tracker.next(GesturePhase::End, 9.0, 10.0), (2.0, 6.0));
-        assert_eq!(tracker.next(GesturePhase::Start, 1.0, 2.0), (1.0, 2.0));
-    }
-
-    #[test]
-    fn cancelled_pan_resets_delta_state() {
-        let mut tracker = PanDeltaTracker::default();
-        tracker.next(GesturePhase::Start, 4.0, 8.0);
-
-        assert_eq!(tracker.next(GesturePhase::Cancel, 6.0, 9.0), (0.0, 0.0));
-        assert_eq!(tracker.next(GesturePhase::Start, 2.0, 3.0), (2.0, 3.0));
-    }
 }
 
 /// Continuous callbacks remain the default for existing consumers.

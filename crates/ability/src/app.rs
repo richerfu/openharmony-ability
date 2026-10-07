@@ -90,7 +90,7 @@ pub struct OpenHarmonyAppInner {
     /// Owner token of this native module's one active DefaultXComponent render.
     render_owner: Option<String>,
     touch_input_delivery: TouchInputDelivery,
-    frame_input_delivery: HashMap<i64, crate::FrameInputDelivery>,
+    frame_input_delivery: HashMap<i64, crate::render::FrameDeliveryState>,
     render_thread: Option<std::thread::ThreadId>,
     surface_active: bool,
     sub_surfaces: HashMap<i64, SubRenderSurface>,
@@ -362,6 +362,7 @@ impl OpenHarmonyAppInner {
         self.raw_window = None;
         self.rect = Rect::default();
         self.surface_active = false;
+        self.frame_input_delivery.entry(0).or_default().invalidate();
         true
     }
 
@@ -375,6 +376,7 @@ impl OpenHarmonyAppInner {
             xcomponent.native_xcomponent().unregister_callbacks();
         }
         self.render_owner = None;
+        self.frame_input_delivery.entry(0).or_default().invalidate();
         self.surface_active = false;
         self.raw_window = None;
         self.xcomponent = None;
@@ -728,20 +730,18 @@ impl OpenHarmonyApp {
         delivery: crate::FrameInputDelivery,
     ) -> Result<()> {
         let target = {
-            let inner = self
+            let mut inner = self
                 .inner
-                .read()
-                .map_err(|_| Error::from_reason("Cannot read frame delivery"))?;
+                .write()
+                .map_err(|_| Error::from_reason("Cannot update frame delivery"))?;
             if inner
                 .frame_input_delivery
                 .get(&window_id)
-                .copied()
-                .unwrap_or_default()
-                == delivery
+                .is_some_and(|state| state.is_applied(delivery))
             {
                 return Ok(());
             }
-            if window_id == 0 {
+            let target = if window_id == 0 {
                 inner
                     .xcomponent
                     .as_ref()
@@ -759,23 +759,36 @@ impl OpenHarmonyApp {
                             surface.owner.clone(),
                         )
                     })
-            }
-        };
-        if let Some((native, owner)) = target {
-            if self.inner.read().ok().and_then(|inner| inner.render_thread)
-                != Some(std::thread::current().id())
-            {
+            };
+            if target.is_some() && inner.render_thread != Some(std::thread::current().id()) {
                 return Err(Error::from_reason(
                     "Active frame delivery must change on the UI thread",
                 ));
             }
+            if !inner
+                .frame_input_delivery
+                .entry(window_id)
+                .or_default()
+                .request(delivery)
+            {
+                return Ok(());
+            }
+            target
+        };
+        if let Some((native, owner)) = target {
             self.configure_frame_callback(&native, window_id, &owner, delivery)?;
+            let mut inner = self
+                .inner
+                .write()
+                .map_err(|_| Error::from_reason("Cannot store frame delivery"))?;
+            if inner.frame_owner_is_active(&owner) {
+                inner
+                    .frame_input_delivery
+                    .entry(window_id)
+                    .or_default()
+                    .applied(delivery);
+            }
         }
-        self.inner
-            .write()
-            .map_err(|_| Error::from_reason("Cannot store frame delivery"))?
-            .frame_input_delivery
-            .insert(window_id, delivery);
         Ok(())
     }
 
@@ -783,7 +796,12 @@ impl OpenHarmonyApp {
         self.inner
             .read()
             .ok()
-            .and_then(|inner| inner.frame_input_delivery.get(&window_id).copied())
+            .and_then(|inner| {
+                inner
+                    .frame_input_delivery
+                    .get(&window_id)
+                    .map(|state| state.requested)
+            })
             .unwrap_or_default()
     }
 
@@ -978,6 +996,15 @@ impl OpenHarmonyApp {
             })
             .unwrap_or(false);
         if deactivated {
+            if let Some(window_id) = window_id {
+                if let Ok(mut inner) = self.inner.write() {
+                    inner
+                        .frame_input_delivery
+                        .entry(window_id)
+                        .or_default()
+                        .invalidate();
+                }
+            }
             match window_id {
                 Some(0) => {
                     self.ime.borrow_mut().take();
